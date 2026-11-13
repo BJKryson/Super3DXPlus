@@ -48,7 +48,7 @@ python build.py package                     # build/<target>/package/: the playe
 The first build compiles the physics (`phys_rc.c`, a minute or two); later ones only what changed. `play.bat` starts the game with its
 data and saves next to it (`play.bat --size 1280x960` for a bigger window; the layout is 4:3).
 
-Run it: double-click `super3dx.exe` (it takes `data/` and `save/` from beside itself, opens at 1280x960 and has the high-quality effects on; `play.bat` is optional), or from a shell: `buildwindowssuper3dx.exe [data] [--save save] [--size WxH] [--fullscreen]`. `MT3DX_HQ=0` turns the effects off (a slow GPU). Controls and remapping: `docs/INPUT.md`.
+Run it: double-click `super3dx.exe` (it takes `data/` and `save/` from beside itself, opens at 1280x960 and has the high-quality effects on; `play.bat` is optional), or from a shell: `build\windows\super3dx.exe [data] [--save save] [--size WxH] [--fullscreen]`. `MT3DX_HQ=0` turns the effects off (a slow GPU). Controls and remapping: `docs/INPUT.md`.
 
 ## Raspberry Pi 5
 
