@@ -1,0 +1,23 @@
+/* The versus's measuring (net.c): how old the other machines' race data is when it is used, the round trip to the host, and what an
+ * artificial bad connection does to both. For the netcode work (docs/VERSUS.md "Measuring"); it only logs. MT3DX_NET_LAG=<ms>[,<jitter ms>[,<loss %>]]
+ * delays (and loses) every packet this machine receives; set it on both ends for a two-way lag. */
+#ifndef NETDIAG_H
+#define NETDIAG_H
+#include <stdio.h>
+
+/* the frames behind this machine's own that the newest race packet from machine pcb was when it arrived (the clocks start together at the
+ * GO: so this is the network's age of it, plus the start's difference); -1000 if none came yet */
+int net_age_frames(int pcb);
+/* the round trip to the host in ms (the last answer); -1 none yet */
+double net_rtt_ms(void);
+
+/* how many frames this machine's race clock is ahead of machine pcb's (the clients pace themselves to the host's with it, app.c vs_pace); valid is
+ * 0 until enough packets and a round trip are in */
+double net_clock_ahead_frames(int pcb, int *valid);
+
+/* the measuring's log lines (versus net / sync / predict / react / spike / calib / trace / own jump / contact / near) only with MT3DX_NETLOG=1 in the environment: they are
+ * for the netcode work, and a race writes hundreds of them. The behaviour they describe is always on. */
+int net_log_on(void);
+#define NETLOG(...) do { if (net_log_on()) fprintf(stderr, __VA_ARGS__); } while (0)
+
+#endif

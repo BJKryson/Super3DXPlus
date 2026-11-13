@@ -1,0 +1,5 @@
+capstone
+unicorn
+pillow
+numpy
+cxxfilt; platform_system == "Windows"  # (a C++ demangler where c++filt is not installed)
