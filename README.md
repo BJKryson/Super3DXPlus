@@ -32,7 +32,7 @@ python build.py doctor                      # what you have and what is missing
 python build.py all /path/to/the/dump       # tables, physics, data (long: an hour or more), the player, a folder to zip
 ```
 
-Steps, the options and the other targets (Linux, the Pi, Android) are in `docs/BUILDING.md`. Run the result with
+Steps, the options and the other targets (Linux, the Pi, Android) are in `docs/BUILDING.md`. Run the result by double-clicking `super3dx.exe` in the folder, or with
 `build/windows/package/play.bat` (or `play.sh`); the data and the saves live next to it.
 
 ## Layout

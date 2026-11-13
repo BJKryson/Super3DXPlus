@@ -94,7 +94,7 @@ Edit and `sudo systemctl restart wmmt`. A smaller safe area gives a smaller, sof
 ### Texture filtering (`~/game/save/graphics`)
 
 `aniso 4` and `lodbias -2`: sharper distance textures than the PC default (-1); a CRT at 480 lines shows detail a PC does not.
-The player forces anisotropic filtering off unless `MT3DX_HQ=1`; the service sets `WMMT_ANISO=4` (read by `app.c`) to turn it on.
+On the Pi (and with `--crt`) the player keeps the high-quality effects off unless `MT3DX_HQ=1` (a PC has them on; `MT3DX_HQ=0` turns them off); the service sets `WMMT_ANISO=4` (read by `app.c`) to turn it on.
 Mip bias runs -3 .. 3 (negative sharper); 8x anisotropic was judged too much.
 
 ## Audio

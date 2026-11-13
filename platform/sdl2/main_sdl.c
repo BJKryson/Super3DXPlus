@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 #include "app.h"
 #include "bind.h"
@@ -451,9 +455,16 @@ static int game(void *arg) {
   fprintf(stderr, "swap interval: asked %d, set %s, now %d\n", interval, sw == 0 ? "ok" : SDL_GetError(), SDL_GL_GetSwapInterval());
   app_save_dir(P.save_dir);
   app_console(); /* a machine that can draw the maps far */
-  /* The phone's extras (multisampled half-float 3D, bloom, 16x anisotropic) cost a software renderer, and a CRT's 480 lines
-   * or a Pi's GPU have no use for them: off unless asked for (MT3DX_HQ=1). */
-  if (!getenv("MT3DX_HQ")) {
+  /* The phone's extras (multisampled half-float 3D, bloom, 16x anisotropic) are on for a desktop PC. A CRT's 480 lines or a
+   * Pi's GPU have no use for them (and a software renderer cannot pay for them): off there, unless MT3DX_HQ=1; MT3DX_HQ=0
+   * turns them off on a PC too. */
+  int hq = 1;
+#if defined(__aarch64__) || defined(__arm__)
+  hq = 0;
+#endif
+  if (CRT.on) hq = 0;
+  if (getenv("MT3DX_HQ")) hq = atoi(getenv("MT3DX_HQ")) != 0;
+  if (!hq) {
     setenv("WMMT_NO_HQ", "1", 0);
     setenv("WMMT_ANISO", "1", 0);
   }
@@ -763,23 +774,58 @@ static float to_layout_y(int y) {
 }
 
 int main(int argc, char **argv) {
-  int w = LAYOUT_W, h = LAYOUT_H, fullscreen = 0;
+  int w = LAYOUT_W, h = LAYOUT_H, fullscreen = 0, sized = 0;
   int use_loader_thread = getenv("MT3DX_LOADER_THREAD") != NULL;
   const char *data = NULL, *save = NULL;
   for (int i = 1; i < argc; ++i) {
     if (!strcmp(argv[i], "--loader-thread")) use_loader_thread = 1;
     else if (!strcmp(argv[i], "--save") && i + 1 < argc) save = argv[++i];
-    else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &w, &h);
+    else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &w, &h), sized = 1;
     else if (!strcmp(argv[i], "--fullscreen")) fullscreen = 1;
     else if (!strcmp(argv[i], "--crt")) CRT.on = 1, crt_config();
     else if (!strcmp(argv[i], "--hud") && i + 1 < argc) P.hud_touch = !strcmp(argv[++i], "touch");
     else if (argv[i][0] != '-') data = argv[i];
     else { fprintf(stderr, "unknown option %s\n", argv[i]); return 2; }
   }
+  /* Started with nothing (a double-click on the exe): the data and the saves are the folders next to the program. */
+  static char base_data[1024], base_save[1024];
+  char *base = SDL_GetBasePath();
+  if (!data && base) {
+    snprintf(base_data, sizeof base_data, "%sdata", base);
+    data = base_data;
+  }
+  if (!save && base && data == base_data) {
+    snprintf(base_save, sizeof base_save, "%ssave", base);
+    save = base_save;
+  }
+  if (base) SDL_free(base);
   if (!data) {
-    fprintf(stderr, "usage: %s <data dir> [--save DIR] [--size WxH] [--fullscreen] [--crt] [--hud arcade|touch] [--loader-thread]\n", argv[0]);
+    fprintf(stderr, "usage: %s [data dir] [--save DIR] [--size WxH] [--fullscreen] [--crt] [--hud arcade|touch] [--loader-thread]\n", argv[0]);
     return 2;
   }
+  if (data == base_data) {
+    char probe[1100];
+    snprintf(probe, sizeof probe, "%s/menu.bin", data);
+    FILE *f = fopen(probe, "rb");
+    if (!f) {
+      static char msg[1400];
+      snprintf(msg, sizeof msg, "The game's data was not found in:\n%s\n\nBuild it from your own copy of the game (see the README), "
+               "or start the program with the data folder as its argument.", data);
+      fprintf(stderr, "%s\n", msg);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Super3DX+", msg, NULL);
+      return 2;
+    }
+    fclose(f);
+  }
+  if (save == base_save) {
+#ifdef _WIN32
+    _mkdir(save);
+#else
+    mkdir(save, 0755);
+#endif
+  }
+  /* a desktop window opens at a size worth looking at (the layout is 4:3); --size, the CRT and the Pi's fullscreen set their own */
+  if (!sized && !fullscreen && !CRT.on) w = 1280, h = 960;
   snprintf(P.data_dir, sizeof P.data_dir, "%s", data);
   snprintf(P.save_dir, sizeof P.save_dir, "%s", save ? save : data);
   setvbuf(stderr, NULL, _IOLBF, 0);

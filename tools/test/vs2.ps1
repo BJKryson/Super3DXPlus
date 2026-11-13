@@ -20,7 +20,7 @@ foreach ($role in $roles) {
   New-Item -ItemType Directory -Force $dir | Out-Null
   Remove-Item -Recurse -Force "$runs\save-$Name$role" -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Force "$runs\save-$Name$role" | Out-Null
-  $env:MT3DX_LOG = '1'; $env:MT3DX_AUTOSTART = '3'; $env:MT3DX_AUTOQUIT = "$Quit"
+  $env:MT3DX_LOG = '1'; $env:MT3DX_HQ = '0'; $env:MT3DX_AUTOSTART = '3'; $env:MT3DX_AUTOQUIT = "$Quit"
   $env:MT3DX_SHOT = $(if ($role -eq 'host') { $Shots } else { $ClientShots }); $env:MT3DX_SHOT_DIR = $dir
   $env:MT3DX_SCRIPT = '25:@OK+;37:@OK+;'
   $env:MT3DX_GOTO = '36'; $env:MT3DX_VSKM = "$Km"; $env:MT3DX_AUTODRIVE = '1'

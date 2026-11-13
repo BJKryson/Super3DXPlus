@@ -310,7 +310,7 @@ def package(target):
     if target == "windows":
         shutil.copy(os.path.join(out, "SDL2.dll"), pk)
         open(os.path.join(pk, "play.bat"), "w", newline="\r\n").write(
-            '@echo off\nrem Double-click to play. play.bat --size 1280x960 for a bigger window (the layout is 4:3); saves go to the save folder.\n'
+            '@echo off\nrem Optional: super3dx.exe can be double-clicked as it is. This one adds options, e.g. play.bat --size 1600x1200 (the layout is 4:3); saves go to the save folder.\n'
             'cd /d "%~dp0"\nif not exist save mkdir save\nsuper3dx.exe "%~dp0data" --save "%~dp0save" %*\n')
     else:
         p = os.path.join(pk, "play.sh")
