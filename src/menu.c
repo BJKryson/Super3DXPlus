@@ -2216,8 +2216,8 @@ static void draw_layout(const menu_state *m, int clock, float screen_w, float sc
  * each time (the graphics rows the build offers: Android's, an iPad's resolution). The touch controls are the CONTROLS screen's. ---- */
 static int option_touch(void) { return hud_style() == HUD_STYLE_TOUCH; }
 
-enum { OK_SWITCH, OK_MIP, OK_RES, OK_AA, OK_SUB, OK_INFO };
-#define IS_SUB(r) ((r)->kind == OK_SUB || (r)->kind == OK_INFO) /* a row that is a button to another screen */
+enum { OK_SWITCH, OK_MIP, OK_RES, OK_AA, OK_SUB, OK_INFO, OK_RUMBLE, OK_PCT };
+#define IS_SUB(r) ((r)->kind == OK_SUB || (r)->kind == OK_INFO || (r)->kind == OK_RUMBLE) /* a row that is a button to another screen */
 typedef struct { const char *name, *note; int kind; int *v; } orow;
 
 static const char *const MIP_NAME[4] = { "SOFT", "NORMAL", "SHARP", "SHARPER" };
@@ -2227,7 +2227,8 @@ float menu_mip_bias(const menu_state *m) { return MIP_BIAS[m->mip >= 0 && m->mip
 #define OPTL_Y0 118.0f /* (640 x 480) the first row's middle */
 #define OPTL_X_ON 330.0f
 #define OPTL_GAP 10.0f
-#define OPTL_DY 28.0f /* the options' rows; the debug options' are further apart */
+#define OPTL_DY 28.0f /* the options' rows (25 with more than 9 of them, so the last still clears the note); the debug options' are further apart */
+static float optl_dy(int n) { return n > 9 ? 25.0f : OPTL_DY; }
 #define OPTL_DY_DEBUG 36.0f
 
 /* a row's chip c: its left edge and width */
@@ -2248,6 +2249,7 @@ static int option_rows(menu_state *m, orow r[12]) {
     r[n++] = (orow){ "ANTI-ALIASING", "MSAA: SMOOTHS HARD EDGES", OK_AA, &m->aa4 };
   }
   if (m->res_row) r[n++] = (orow){ "RESOLUTION", "TAKES EFFECT AT THE NEXT START", OK_RES, &m->hires };
+  r[n++] = (orow){ "VIBRATION", "CONTROLLER RUMBLE: WALL HITS, EXPANSION JOINTS AND TIRE SLIP", OK_RUMBLE, NULL };
   r[n++] = (orow){ "DEBUG OPTIONS", "ADDITIONAL INFORMATION READOUTS", OK_SUB, NULL };
   r[n++] = (orow){ "INFORMATION", "ABOUT THIS PORT", OK_INFO, NULL };
   return n;
@@ -2263,6 +2265,16 @@ static int debug_rows(menu_state *m, orow r[4]) {
 /* chip c of a row chosen (not for the sub-menu's button) */
 static void optl_chip_set(menu_state *m, const orow *r, int c) {
   if (IS_SUB(r) || !r->v) return;
+  if (r->kind == OK_PCT) { /* (the vibration's tenths: the left chip one less, the right one more) */
+    int to = *r->v + (c == 0 ? -1 : 1);
+    if (to < 0 || to > 10) {
+      snd_menu(SND_CANCEL);
+      return;
+    }
+    *r->v = to, m->garage_changed = 1;
+    snd_menu(SND_CURSOR);
+    return;
+  }
   if (r->kind == OK_MIP) { /* (a four-step setting: the left chip one softer, the right one sharper) */
     int to = *r->v + (c == 0 ? -1 : 1);
     if (to < 0 || to > 3) {
@@ -2297,6 +2309,7 @@ static int optl_step(menu_state *m, const orow *rows, int n, int *sel, const men
   if (in->ok) {
     if (IS_SUB(r)) return 1;
     if (r->kind == OK_MIP) m->mip = (m->mip + 1) % 4, m->garage_changed = 1, snd_menu(SND_CURSOR);
+    else if (r->kind == OK_PCT) *r->v = (*r->v + 1) % 11, m->garage_changed = 1, snd_menu(SND_CURSOR);
     else optl_chip_set(m, r, r->kind == OK_RES ? !*r->v : (*r->v ? 1 : 0));
   }
   return 0;
@@ -2336,18 +2349,20 @@ static void draw_optlist(const menu_state *m, const orow *rows, int n, int sel, 
     for (int c = 0; c < (IS_SUB(o) ? 1 : 2); ++c) {
       float x, w;
       optl_chip(o, c, &x, &w);
-      int lit = o->kind == OK_MIP || IS_SUB(o) ? 1 : o->kind == OK_RES ? on == c : on == !c;
+      int lit = o->kind == OK_MIP || o->kind == OK_PCT || IS_SUB(o) ? 1 : o->kind == OK_RES ? on == c : on == !c;
       hud_ui_rect(x * k, (y - 0.5f * chip_h) * k, w * k, chip_h * k, lit ? 0.35f : 0.0f, lit ? 0.15f : 0.0f, 0.0f, lit ? 0.9f : 0.4f);
       if (lit) hud_ui_rect(x * k, (y + 0.5f * chip_h - 2.0f) * k, w * k, 2.0f, 1.0f, 0.42f, 0.05f, 1.0f);
-      const char *s = IS_SUB(o) ? "OPEN >" : o->kind == OK_MIP ? (c ? "SHARPER" : "SOFTER") : o->kind == OK_RES ? (m->res_phone ? (c ? "960 X 640" : "480 X 320") : (c ? "2048 X 1536" : "1024 X 768"))
+      const char *s = IS_SUB(o) ? "OPEN >" : o->kind == OK_MIP ? (c ? "SHARPER" : "SOFTER") : o->kind == OK_PCT ? (c ? "MORE" : "LESS") : o->kind == OK_RES ? (m->res_phone ? (c ? "960 X 640" : "480 X 320") : (c ? "2048 X 1536" : "1024 X 768"))
                     : o->kind == OK_AA ? (c ? "2X" : "4X") : c ? "OFF" : "ON";
-      float px = o->kind == OK_MIP || o->kind == OK_RES ? 1.8f : chip_px;
+      float px = o->kind == OK_MIP || o->kind == OK_RES || o->kind == OK_PCT ? 1.8f : chip_px;
       hud_ui_text(s, (x + 0.5f * w) * k - 0.5f * hud_ui_text_width(s, px), y * k - 3.5f * px, px, 1, 1, 1, lit ? 1.0f : 0.45f);
     }
-    if (o->kind == OK_MIP) {
+    if (o->kind == OK_MIP || o->kind == OK_PCT) {
       float x, w;
       optl_chip(o, 1, &x, &w);
-      hud_ui_text(MIP_NAME[on >= 0 && on < 4 ? on : 2], (x + w + 14.0f) * k, y * k - 3.5f * chip_px, chip_px, 1, 0.55f, 0.15f, 1);
+      char pct[8];
+      snprintf(pct, sizeof pct, "%d%%", on * 10);
+      hud_ui_text(o->kind == OK_MIP ? MIP_NAME[on >= 0 && on < 4 ? on : 2] : pct, (x + w + 14.0f) * k, y * k - 3.5f * chip_px, chip_px, 1, 0.55f, 0.15f, 1);
     }
   }
   hud_ui_text(rows[sel].note, 20.0f * k, 380.0f * k, 1.7f, 0.85f, 0.85f, 0.85f, 1);
@@ -2369,12 +2384,63 @@ static void portinfo_enter(menu_state *m) {
   go(m, MENU_PORTINFO);
 }
 
+/* the vibration screen (MENU_RUMBLE): each effect's strength in tenths; the controller's rumble is the sum of what they make */
+static int rumble_rows(menu_state *m, orow r[4]) {
+  r[0] = (orow){ "OVERALL", "EVERYTHING AT ONCE", OK_PCT, &m->rum[0] };
+  r[1] = (orow){ "WALL HITS", "THE JOLT OF A HIT AND THE BUZZ OF A SCRAPE", OK_PCT, &m->rum[1] };
+  r[2] = (orow){ "EXPANSION JOINTS", "THE TAPS OF THE ROAD'S JOINTS, ZEBRA AND GUARD RAIL STRIPS", OK_PCT, &m->rum[2] };
+  r[3] = (orow){ "TIRE SLIP", "THE RUMBLE THAT GROWS AS THE CAR SLIDES SIDEWAYS", OK_PCT, &m->rum[3] };
+  return 4;
+}
+
+static void rumble_enter(menu_state *m) {
+  go(m, MENU_RUMBLE);
+  m->rum_row = 0;
+}
+
+/* back to the game options, with the cursor on the row of the screen just left (a button: OK_SUB, OK_INFO or OK_RUMBLE) */
+static void option_back_to(menu_state *m, int kind) {
+  orow o[12];
+  int n = option_rows(m, o);
+  option_enter(m);
+  for (int i = 0; i < n; ++i)
+    if (o[i].kind == kind) m->focus = i;
+}
+
+static void rumble_step(menu_state *m, const menu_in *in) {
+  if (in->back) {
+    snd_menu(SND_CANCEL);
+    option_back_to(m, OK_RUMBLE);
+    return;
+  }
+  orow r[4];
+  int n = rumble_rows(m, r);
+  optl_step(m, r, n, &m->rum_row, in);
+}
+
+static void draw_rumble(const menu_state *m, int clock, int bars, float screen_w, float screen_h) {
+  const float k = 1.6f;
+  draw_back(ID.bg, clock % 600, 1);
+  anm_draw(ID.line, clock % anm_frames(ID.line), 1);
+  anm_swap title = { anm_sprite(T_TOPBAR_MES), -1 };
+  draw_topbar(bars, 1, &title);
+  draw_bottom(bars, 1);
+  hud_ui_begin(screen_w, screen_h);
+  hud_ui_text("VIBRATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
+  hud_ui_end();
+  orow r[4];
+  int n = rumble_rows((menu_state *)m, r);
+  draw_optlist(m, r, n, m->rum_row, OPTL_DY_DEBUG, screen_w, screen_h);
+}
+
 static void option_step(menu_state *m, const menu_in *in) {
   orow r[12];
   int n = option_rows(m, r);
   if (optl_step(m, r, n, &m->focus, in)) {
     snd_menu(SND_SELECT);
-    if (m->focus >= 0 && m->focus < n && r[m->focus].kind == OK_INFO) portinfo_enter(m);
+    int kind = m->focus >= 0 && m->focus < n ? r[m->focus].kind : OK_SUB;
+    if (kind == OK_INFO) portinfo_enter(m);
+    else if (kind == OK_RUMBLE) rumble_enter(m);
     else hudopt_enter(m);
   }
 }
@@ -2383,10 +2449,7 @@ static void option_step(menu_state *m, const menu_in *in) {
 static void portinfo_step(menu_state *m, const menu_in *in) {
   if (!in->back && !in->ok) return;
   snd_menu(SND_CANCEL);
-  orow o[12];
-  int n = option_rows(m, o);
-  option_enter(m);
-  m->focus = n - 1; /* (the button, where it was taken) */
+  option_back_to(m, OK_INFO);
 }
 
 static void draw_portinfo(const menu_state *m, int clock, int bars, float screen_w, float screen_h) {
@@ -2411,10 +2474,7 @@ static void draw_portinfo(const menu_state *m, int clock, int bars, float screen
 static void hudopt_step(menu_state *m, const menu_in *in) {
   if (in->back) {
     snd_menu(SND_CANCEL);
-    orow o[12];
-    int n = option_rows(m, o);
-    option_enter(m);
-    m->focus = n - 1; /* (the debug options' button, where it was taken) */
+    option_back_to(m, OK_SUB);
     return;
   }
   orow r[4];
@@ -2430,7 +2490,7 @@ static void draw_option(const menu_state *m, int clock, int bars, float screen_w
   draw_bottom(bars, 1);
   orow r[12];
   int n = option_rows((menu_state *)m, r);
-  draw_optlist(m, r, n, m->focus, OPTL_DY, screen_w, screen_h);
+  draw_optlist(m, r, n, m->focus, optl_dy(n), screen_w, screen_h);
 }
 
 static void draw_hudopt(const menu_state *m, int clock, int bars, float screen_w, float screen_h) {
@@ -6828,6 +6888,7 @@ void menu_init(menu_state *m) {
   for (int i = 0; i < 4; ++i) m->vol[i] = 10; /* (the volume mixer, full, but the overall level at half) */
   m->vol[0] = 5;
   m->ten_beep = 1;
+  m->rum[0] = 10, m->rum[1] = 10, m->rum[2] = 10, m->rum[3] = 8;
   m->mip = 2;
   /* (the SSAO off: its 20 ms on the Mi 6 cost the 60 fps) */
   m->hd_tex = 1, m->bloom_on = 0, m->ssao_on = 0, m->wet_on = 0, m->paint_on = 1, m->aa4 = 0;
@@ -10296,6 +10357,11 @@ static int menu_pointer(const menu_state *m, menu_in *in) {
     optl_pointer(m, in, r, debug_rows((menu_state *)m, r), OPTL_DY_DEBUG);
     return 1;
   }
+  if (m->screen == MENU_RUMBLE) {
+    orow r[4];
+    optl_pointer(m, in, r, rumble_rows((menu_state *)m, r), OPTL_DY_DEBUG);
+    return 1;
+  }
   if (m->screen == MENU_BINDINGS && bind_touch(m)) {
     touchctl_pointer(m, in);
     return 1;
@@ -10340,7 +10406,7 @@ static int menu_pointer(const menu_state *m, menu_in *in) {
   }
   if (m->screen == MENU_OPTION) { /* a row and the chip tapped on it */
     orow r[12];
-    optl_pointer(m, in, r, option_rows((menu_state *)m, r), OPTL_DY);
+    { int on_ = option_rows((menu_state *)m, r); optl_pointer(m, in, r, on_, optl_dy(on_)); }
     return 1;
   }
   if (m->screen == MENU_TG_GET || m->screen == MENU_TG_AERO) { /* either side of the middle steps, the middle decides */
@@ -10909,6 +10975,10 @@ static void step(menu_state *m) {
     portinfo_step(m, &in);
     return;
   }
+  if (m->screen == MENU_RUMBLE) {
+    rumble_step(m, &in);
+    return;
+  }
   if (m->screen == MENU_SETTING) {
     if (m->vs.tuning && m->vs.tune_timer > 0) m->vs.tune_timer--;
     if (setting_step(m, &in)) m->deciding = FADE;
@@ -11411,7 +11481,7 @@ void menu_draw(const menu_state *m, float screen_w, float screen_h, void (*draw3
     bottom_kind = m->card_back == MENU_SETTING ? BK_GC : !cardpages_ok() ? BK_GC : m->card_page == CP_TA ? BK_BP_GC_VS : BK_BP_GC;
     break;
   case MENU_CAR: case MENU_COLOR: case MENU_COURSE: case MENU_BGM: case MENU_TEN_COURSE: case MENU_TEN_LEVEL: case MENU_GARAGE: case MENU_NAME:
-  case MENU_OPTION: case MENU_SAVE: case MENU_BINDINGS: case MENU_HUDOPT: case MENU_VOLUME: case MENU_PORTINFO:
+  case MENU_OPTION: case MENU_SAVE: case MENU_BINDINGS: case MENU_HUDOPT: case MENU_VOLUME: case MENU_PORTINFO: case MENU_RUMBLE:
     bottom_kind = BK_HS_BB_GD;
     break;
   default: bottom_kind = BK_NONE; break;
@@ -11580,6 +11650,13 @@ void menu_draw(const menu_state *m, float screen_w, float screen_h, void (*draw3
   if (m->screen == MENU_PORTINFO) {
     if (m->t < FADE) fade = (float)(m->t + 1) / FADE;
     draw_portinfo(m, clock, bars, screen_w, screen_h);
+    hud_draw_menu_keys(screen_w, screen_h, m->key_held, 0, 1);
+    anm_fill(0, 0, 0, 1.0f - fade);
+    return;
+  }
+  if (m->screen == MENU_RUMBLE) {
+    if (m->t < FADE) fade = (float)(m->t + 1) / FADE;
+    draw_rumble(m, clock, bars, screen_w, screen_h);
     hud_draw_menu_keys(screen_w, screen_h, m->key_held, 0, 1);
     anm_fill(0, 0, 0, 1.0f - fade);
     return;

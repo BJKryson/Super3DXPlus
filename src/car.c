@@ -1471,6 +1471,8 @@ void car_update(car_state *c, const car_input *in) {
   read_rival(c);
   read_race(&c->race);
   read_se(&c->se);
+  c->camfx[0] = MF(P.m + 0xb60 + 8), c->camfx[1] = MF(P.m + 0xb60 + 0xc);
+  c->camfx[2] = MF(P.m + 0xb60 + 0x14), c->camfx[3] = MF(P.m + 0xb60 + 0x18);
   /* velocity from the frame's displacement (display units per frame -> m/s) */
   float v[3] = { (c->pos[0] - prev[0]) * 6.0f, (c->pos[1] - prev[1]) * 6.0f, (c->pos[2] - prev[2]) * 6.0f };
   const float *M = c->body;

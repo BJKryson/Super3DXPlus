@@ -9,7 +9,13 @@ Builds: **Export** (English), **JP** (Japan). Targets: Windows SDL2 player, Rasp
 
 ---
 
-## Latest (2026-11-13)
+## Latest (2026-11-14)
+
+- **Controller vibration**: wall hits, expansion joints and tyre slip on the pad's two motors, each with its own strength under GAME OPTIONS > VIBRATION (`docs/INPUT.md`).
+- **Desktop defaults**: `super3dx.exe` starts by double-click (`data/` and `save/` beside it, 1280x960, the high-quality effects on).
+- Fix: the steering filter's settings are saved again (the options file wrote `filter` and read `filter3`).
+
+## 2026-11-13
 
 - **Versus as the real machine shows it**: Please wait! screens over the votes, the black loading screen before the VS cutscene (with the engine rev and
   brake), cars drawn over the discs; the route choice with the leader deciding (the destination boards, "Choose a direction", the junction walls

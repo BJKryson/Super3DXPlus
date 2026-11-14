@@ -199,6 +199,10 @@ typedef struct {
   unsigned char spot, rival_spot[CAR_RIVALS];
   car_effect effect, rival_effect[CAR_RIVALS];
   float tyre_radius[1 + CAR_RIVALS]; /* the player's, the rivals' (display units; 0 unknown) */
+  /* the arcade's own camera-effect object (yt::CCamEff, the machine's +0xb60), which CMachine::Set_SE_Effect_Reactive asks for a shake on an
+   * expansion joint (CheckGap), a zebra and a guard rail: the two strengths it holds (+8, +0xc; they decay each frame) and the two shakes
+   * Drive makes of them (+0x14, +0x18). The player's car only (the rivals' machines are not driven through it). */
+  float camfx[4];
   car_phys phys;
   car_race race;
 } car_state;

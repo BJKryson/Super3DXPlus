@@ -15,10 +15,10 @@ repository, and nothing generated from it either.
   Japan and Export (English) builds of 3DX+.
 - Versus over a LAN or through a relay: up to four machines (tested with two and three, PC and Pi), the route choice at a junction with the
   leader deciding, the last-stretch call, places, disconnect handling, the winner's choice of music. See `docs/VERSUS.md`.
-- Controller (and keyboard) input with remapping, the arcade HUD or a touch HUD, the arcade's sound.
+- Controller (and keyboard) input with remapping, controller vibration (wall hits, expansion joints, tyre slip), the arcade HUD or a touch HUD, the arcade's sound.
 - A Raspberry Pi 5 image path: the game starts at boot on a CRT at 60 fps (`docs/PI.md`).
 
-Not done yet, or not tested: controller vibration, the Pi's HDMI output on real hardware, the Buildroot image, some of the story
+Not done yet, or not tested: controller vibration on pads other than the one it was tried with, the Pi's HDMI output on real hardware, the Buildroot image, some of the story
 extras. `CHANGELOG.md` has the history; `docs/PLAN.md` the plan.
 
 ## Quick start

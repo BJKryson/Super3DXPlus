@@ -41,6 +41,8 @@ void app_tune(int on); /* the steering filter's tuning panel on, off or (-1) fli
 int app_bind_capturing(void);
 /* The race is on screen and takes the keys (not a menu, the pause menu or a result). */
 int app_racing(void);
+/* the controller rumble now, 0..1 each: the heavy motor and the light (zero outside a running race; haptic.h) */
+void app_rumble(float *low, float *high);
 float app_speed_kmh(void); /* the player's car's speed, signed */
 /* The iPad's turn about the screen's normal from level (radians, clockwise as the player
  * sees it positive), for steering by tilt (the OPTION screen's GYRO); main.m each frame. */

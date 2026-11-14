@@ -57,6 +57,8 @@ static struct {
   volatile int game_done;
 } P;
 
+static void pad_rumble_frame(void);
+
 #ifdef WMMT_WIN
 int gl_load(void); /* build.py's generated lookup of the GL functions */
 #endif
@@ -536,6 +538,7 @@ static int game(void *arg) {
       app_key(APP_KEY_BRAKE, brake);
     }
     app_frame(dt);
+    pad_rumble_frame();
     /* the attract loop's movies (movie.c: data_dir/intro.wmv, playdemo.wmv, tutorial.wmv); one that is not there ends at once */
     int want = app_movie();
     if (want != movie) {
@@ -615,6 +618,22 @@ static int game_thread(void *arg) {
 /* ---- pads (SDL's game controller layer: anything with a mapping, XInput and DirectInput pads, PlayStation, Switch...) ---- */
 
 static SDL_GameController *PAD[8];
+
+/* The pad's rumble (haptic.h through app_rumble): sent each frame it changes and again before the last one runs out (the pad is told how long
+ * a rumble lasts, 120 ms, so a frozen game lets it die), to every pad that is open. A pad without rumble ignores it. */
+static void pad_rumble_frame(void) {
+  static Uint16 sent_low, sent_high;
+  static Uint32 sent_at;
+  float lo, hi;
+  app_rumble(&lo, &hi);
+  Uint16 l = (Uint16)(lo * 65535.0f), h = (Uint16)(hi * 65535.0f);
+  Uint32 now = SDL_GetTicks();
+  int changed = abs((int)l - (int)sent_low) > 1500 || abs((int)h - (int)sent_high) > 1500 || ((l == 0) != (sent_low == 0)) || ((h == 0) != (sent_high == 0));
+  if (!changed && !((l || h) && now - sent_at >= 80)) return;
+  for (int i = 0; i < 8; ++i)
+    if (PAD[i]) SDL_GameControllerRumble(PAD[i], l, h, l || h ? 120 : 0);
+  sent_low = l, sent_high = h, sent_at = now;
+}
 
 static void pad_open(int index) {
   if (!SDL_IsGameController(index)) return;

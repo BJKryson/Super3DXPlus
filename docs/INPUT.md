@@ -170,3 +170,16 @@ OPTION > HUD OPTIONS (next to KEY BINDINGS, under CONTROLS) has three switches, 
 options file; the back mirror stays on its old line): **INPUT READOUT** (the steering, gas and brake bars over the race), **FPS COUNTER** (the
 mobile HUD's frame rate counter in the arcade HUD, top middle; the touch HUD always shows its own) and **BACK MIRROR**, which moved here from
 the graphics list. Left is ON, right OFF, OK flips, back leaves.
+
+## Vibration
+
+The pad's two rumble motors follow the player's car in a running race (nothing in the menus, the countdown or the pause):
+
+- **Wall hits**: a heavy pulse on both motors when the car hits a wall (the arcade's own camera-shake request together with the hit's change of
+  velocity decide its strength), and a lighter buzz for as long as the arcade throws scrape sparks.
+- **Expansion joints**: a short, sharp tap on the light motor, twice a joint (the front axle, then the rear), harder with speed. The arcade
+  asks the same shake for its road strips (`SAreaData::CheckGap`, `CheckZebra`, `CheckGuardRail`, in `CMachine::Set_SE_Effect_Reactive`).
+- **Tyre slip**: a constant rumble on the heavy motor that grows with the body's slip angle (from about 3 degrees, full at 25) and with speed.
+
+GAME OPTIONS > VIBRATION has OVERALL, WALL HITS, EXPANSION JOINTS and TIRE SLIP, each in tenths (the slip's default is 80 %); they are saved as
+the `rumble4` line of `option`. The code is `src/haptic.c`; `MT3DX_FXLOG=1` logs its pulses.
