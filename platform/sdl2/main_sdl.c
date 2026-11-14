@@ -862,6 +862,11 @@ int main(int argc, char **argv) {
 #endif
 
   SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1"); /* a pad works with the window behind another */
+#ifdef _WIN32
+  /* Windows scales a program that does not say it knows about the screen's scaling (150 %, 200 %): the window's pixels are stretched, which is what
+   * made the fullscreen picture blocky. Per-monitor awareness hands the game the real pixels (the window's size and the drawing are in them). */
+  SDL_SetHint("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2");
+#endif
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) != 0) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     return 1;
@@ -873,6 +878,14 @@ int main(int argc, char **argv) {
   SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
   SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8); /* the cars' shadows */
+  if (!sized && !fullscreen && !CRT.on) { /* the window's own size: 1280 x 960 at 96 dpi, more on a scaled screen, but within the desktop */
+    float ddpi = 96.0f;
+    SDL_Rect area;
+    SDL_GetDisplayDPI(0, &ddpi, NULL, NULL);
+    float sc = ddpi > 96.0f ? ddpi / 96.0f : 1.0f;
+    w = (int)(1280.0f * sc), h = (int)(960.0f * sc);
+    if (SDL_GetDisplayUsableBounds(0, &area) == 0 && h > area.h * 92 / 100) h = area.h * 92 / 100, w = h * 4 / 3;
+  }
   Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
   P.win = SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
   if (!P.win) {

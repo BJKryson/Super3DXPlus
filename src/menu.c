@@ -2242,11 +2242,11 @@ static int option_rows(menu_state *m, orow r[12]) {
   int n = 0;
   r[n++] = (orow){ "BACK MIRROR", "THE MIRROR SHOWN IN BUMPER CAMERA", OK_SWITCH, &m->bm_on };
   r[n++] = (orow){ "TEXTURES", "HOW SHARP THE ROAD'S AND THE SCENERY'S TEXTURES STAY IN THE DISTANCE", OK_MIP, &m->mip };
-  r[n++] = (orow){ "REFLECTION", "THE SKY'S REFLECTION OVER THE CARS", OK_SWITCH, &m->over_on };
+  r[n++] = (orow){ "REFLECTION", "THE CARS' PAINT AND GLASS REFLECT THE SCREEN, AS IN THE ARCADE", OK_SWITCH, &m->over_on };
   if (m->hq_rows) {
     r[n++] = (orow){ "HD TEXTURES", "USE THE OPTIONAL UPSCALED TEXTURES", OK_SWITCH, &m->hd_tex };
     r[n++] = (orow){ "WET ROAD", "ADDS SCREENSPACE REFLECTIONS TO THE ROAD SURFACE", OK_SWITCH, &m->wet_on };
-    r[n++] = (orow){ "PAINT REFLECTIONS", "THE ENVIRONMENT IN THE CARS' PAINT", OK_SWITCH, &m->paint_on };
+    r[n++] = (orow){ "PAINT REFLECTIONS", "EXTRA CLEAR COAT: STREET LIGHTS GLINT ON THE BODYWORK", OK_SWITCH, &m->paint_on };
     r[n++] = (orow){ "ANTI-ALIASING", "MSAA: SMOOTHS HARD EDGES", OK_AA, &m->aa4 };
   }
   if (m->res_row) r[n++] = (orow){ "RESOLUTION", "TAKES EFFECT AT THE NEXT START", OK_RES, &m->hires };

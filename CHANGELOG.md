@@ -12,6 +12,7 @@ Builds: **Export** (English), **JP** (Japan). Targets: Windows SDL2 player, Rasp
 ## Latest (2026-11-14)
 
 - **Controller vibration**: wall hits, expansion joints and tyre slip on the pad's two motors, each with its own strength under GAME OPTIONS > VIBRATION (`docs/INPUT.md`).
+- **Sharp fullscreen**: the Windows player is per-monitor DPI aware, so a scaled screen (125 %, 150 %, 200 %) gets the real pixels instead of a stretched bitmap; the default window is scaled to match.
 - **Window mode**: GAME OPTIONS > WINDOW MODE (and F11 / Alt+Enter) for windowed or fullscreen, remembered between starts.
 - **Screens**: the Information, Debug options and Vibration screens have their own title bars; the Information screen carries the credits and the notice. The default vibration is overall 80 %, wall hits and joints 100 %, tyre slip 50 %.
 - **Desktop defaults**: `super3dx.exe` starts by double-click (`data/` and `save/` beside it, 1280x960, the high-quality effects on).
