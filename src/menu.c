@@ -2238,17 +2238,17 @@ static void optl_chip(const orow *r, int c, float *x, float *w) {
 
 static int option_rows(menu_state *m, orow r[12]) {
   int n = 0;
-  r[n++] = (orow){ "BACK MIRROR", "THE MIRROR OVER THE ROAD BEHIND", OK_SWITCH, &m->bm_on };
-  r[n++] = (orow){ "TEXTURES", "HOW SHARP THE ROAD'S AND THE SCENERY'S TEXTURES STAY IN THE DISTANCE (SOFTER IS BLURRIER, SHARPER MORE SHIMMER)", OK_MIP, &m->mip };
+  r[n++] = (orow){ "BACK MIRROR", "THE MIRROR SHOWN IN BUMPER CAMERA", OK_SWITCH, &m->bm_on };
+  r[n++] = (orow){ "TEXTURES", "HOW SHARP THE ROAD'S AND THE SCENERY'S TEXTURES STAY IN THE DISTANCE", OK_MIP, &m->mip };
   r[n++] = (orow){ "REFLECTION", "THE SKY'S REFLECTION OVER THE CARS", OK_SWITCH, &m->over_on };
   if (m->hq_rows) {
-    r[n++] = (orow){ "HD TEXTURES", "THE SHARPER TEXTURE MAPS", OK_SWITCH, &m->hd_tex };
-    r[n++] = (orow){ "WET ROAD", "THE NIGHT ROAD SHINES WITH THE LIGHTS", OK_SWITCH, &m->wet_on };
+    r[n++] = (orow){ "HD TEXTURES", "USE THE OPTIONAL UPSCALED TEXTURES", OK_SWITCH, &m->hd_tex };
+    r[n++] = (orow){ "WET ROAD", "ADDS SCREENSPACE REFLECTIONS TO THE ROAD SURFACE", OK_SWITCH, &m->wet_on };
     r[n++] = (orow){ "PAINT REFLECTIONS", "THE ENVIRONMENT IN THE CARS' PAINT", OK_SWITCH, &m->paint_on };
-    r[n++] = (orow){ "ANTI-ALIASING", "THE EDGES' SMOOTHING", OK_AA, &m->aa4 };
+    r[n++] = (orow){ "ANTI-ALIASING", "MSAA: SMOOTHS HARD EDGES", OK_AA, &m->aa4 };
   }
   if (m->res_row) r[n++] = (orow){ "RESOLUTION", "TAKES EFFECT AT THE NEXT START", OK_RES, &m->hires };
-  r[n++] = (orow){ "DEBUG OPTIONS", "THE INPUT READOUT, THE FPS COUNTER AND THE PHYSICS PANEL", OK_SUB, NULL };
+  r[n++] = (orow){ "DEBUG OPTIONS", "ADDITIONAL INFORMATION READOUTS", OK_SUB, NULL };
   r[n++] = (orow){ "INFORMATION", "ABOUT THIS PORT", OK_INFO, NULL };
   return n;
 }
@@ -2453,8 +2453,8 @@ static void draw_hudopt(const menu_state *m, int clock, int bars, float screen_w
  * the music and the effects (the menus'); each in tenths. Up and down the rows, left and right the level (a tap on the bar sets it), back
  * leaves. ---- */
 static const char *const VOL_NAME[4] = { "OVERALL", "CAR SOUNDS", "MUSIC", "SOUND EFFECTS" };
-static const char *const VOL_NOTE[4] = { "EVERYTHING AT ONCE", "THE ENGINE, TURBO, TYRES, WALL HITS AND CRASHES",
-                                         "THE MENU AND RACE MUSIC", "THE MENU AND RACE CONSOLE SOUNDS" };
+static const char *const VOL_NOTE[4] = { "MASTER AUDIO LEVEL", "ENGINE, TURBO, TIRES, CRASHES, ETC",
+                                         "MUSIC PLAYED IN BOTH THE MENUS AND RACES", "INTERACTIVE SOUNDS PLAYED IN MENUS" };
 #define VOL_Y0 118.0f /* (640 x 480) */
 #define VOL_DY 44.0f
 #define VOL_BAR_X 250.0f

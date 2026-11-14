@@ -3640,7 +3640,7 @@ static void vs_menu(void) {
       const cardb_car *car = col ? &CARDB_CARS[pl->profile[0]][pl->profile[1]] : NULL;
       vs_ascii(m->vs.car[i], sizeof m->vs.car[i], car ? car->label : "?");
       m->vs.mismatch[i] = i != l->me && !vs_same_build(pl);
-      if (m->vs.mismatch[i]) vs_ascii(m->vs.car[i], sizeof m->vs.car[i], "VERSION MISMATCH, UPDATE");
+      if (m->vs.mismatch[i]) vs_ascii(m->vs.car[i], sizeof m->vs.car[i], "VERSION MISMATCH, PLEASE UPDATE");
       m->vs.racing[i] = pl->status == 1 || pl->status == MENU_VS_LOADED;
       /* the area vote's (menu_vs_status) */
       int st = pl->status;
@@ -3664,10 +3664,10 @@ static void vs_menu(void) {
     fprintf(stderr, "versus: the host went away\n");
     vs_off();
     m->vs.state = MENU_VS_OFF, m->vs.n = 0;
-    snprintf(m->vs.note, sizeof m->vs.note, "THE HOST WENT AWAY");
+    snprintf(m->vs.note, sizeof m->vs.note, "THE HOST LOST CONNECTION");
     return;
   }
-  const char *quiet = m->vs.kind == MENU_VS_NET ? "SERVER NOT ANSWERING" : "HOST NOT ANSWERING";
+  const char *quiet = m->vs.kind == MENU_VS_NET ? "SERVER UNRESPONSIVE" : "HOST UNRESPONSIVE";
   if (m->vs.state == MENU_VS_CONNECTING)
     snprintf(m->vs.note, sizeof m->vs.note, "%s", silent > VS_SILENT ? quiet : "CONNECTING...");
   else if (silent > VS_SILENT)

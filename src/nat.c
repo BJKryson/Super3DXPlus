@@ -344,7 +344,7 @@ static NAT_THREAD_FN worker(void *arg) {
     /* a lease, not for ever: a mapping a crashed game leaves is gone by itself after 2 hours, and the worker renews it every 50 minutes while the game is hosted */
     snprintf(args, sizeof args,
                "<NewRemoteHost></NewRemoteHost><NewExternalPort>%d</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>%d</NewInternalPort>"
-               "<NewInternalClient>%s</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>MT3DX versus</NewPortMappingDescription>"
+               "<NewInternalClient>%s</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>Super3DX+ versus</NewPortMappingDescription>"
                "<NewLeaseDuration>%d</NewLeaseDuration>",
                T.info.port, T.info.port, mine, 7200);
     ok = soap("AddPortMapping", args, buf, BIG) == 0;
@@ -366,7 +366,7 @@ static NAT_THREAD_FN worker(void *arg) {
   else if (T.info.mapped) say(NAT_READY, "THE ROUTER OPENED THE PORT BY ITSELF");
   else {
     char s[64];
-    snprintf(s, sizeof s, "FORWARD UDP PORT %d ON YOUR ROUTER TO THIS DEVICE", T.info.port);
+    snprintf(s, sizeof s, "PLEASE FORWARD UDP PORT %d ON YOUR ROUTER TO THIS DEVICE TO HOST", T.info.port);
     say(NAT_READY, s);
   }
   /* (renewing the lease while the game is hosted) */
