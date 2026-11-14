@@ -181,5 +181,11 @@ The pad's two rumble motors follow the player's car in a running race (nothing i
   asks the same shake for its road strips (`SAreaData::CheckGap`, `CheckZebra`, `CheckGuardRail`, in `CMachine::Set_SE_Effect_Reactive`).
 - **Tyre slip**: a constant rumble on the heavy motor that grows with the body's slip angle (from about 3 degrees, full at 25) and with speed.
 
-GAME OPTIONS > VIBRATION has OVERALL, WALL HITS, EXPANSION JOINTS and TIRE SLIP, each in tenths (the slip's default is 80 %); they are saved as
+GAME OPTIONS > VIBRATION has OVERALL, WALL HITS, EXPANSION JOINTS and TIRE SLIP, each in tenths (the defaults: overall 80 %, the slip 50 %, the others 100 %); they are saved as
 the `rumble4` line of `option`. The code is `src/haptic.c`; `MT3DX_FXLOG=1` logs its pulses.
+
+## Window mode (the PC player)
+
+GAME OPTIONS > WINDOW MODE switches between a window and borderless fullscreen; F11 or Alt+Enter does the same at any time. The choice is
+the `window` line of the `option` file, so the next start opens the same way; `--fullscreen` on the command line starts fullscreen whatever
+was saved. The row is not shown on the Raspberry Pi (it always runs fullscreen) or in a CRT run.

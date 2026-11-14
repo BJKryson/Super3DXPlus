@@ -14,7 +14,7 @@ static struct {
   float scrape;      /* a wall's scrape, smoothed */
   float slip;        /* the slip angle's rumble, smoothed */
   float c[3][2];     /* the three effects (wall, joint, slip), each its heavy and light motor */
-} H = { .pct = { 10, 10, 10, 8 } };
+} H = { .pct = { 8, 10, 10, 5 } };
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : v > hi ? hi : v; }
 

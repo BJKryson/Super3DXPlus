@@ -41,6 +41,11 @@ void app_tune(int on); /* the steering filter's tuning panel on, off or (-1) fli
 int app_bind_capturing(void);
 /* The race is on screen and takes the keys (not a menu, the pause menu or a result). */
 int app_racing(void);
+/* the window mode (the PC player): 0 windowed, 1 fullscreen; app_window_row(1) gives the game options their WINDOW MODE row */
+int app_fullscreen(void);
+void app_set_fullscreen(int on);
+void app_toggle_fullscreen(void);
+void app_window_row(int on);
 /* the controller rumble now, 0..1 each: the heavy motor and the light (zero outside a running race; haptic.h) */
 void app_rumble(float *low, float *high);
 float app_speed_kmh(void); /* the player's car's speed, signed */

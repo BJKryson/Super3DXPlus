@@ -1726,7 +1726,7 @@ static void cardset_open(menu_state *m) {
 
 static void card_enter(menu_state *m, int back);
 
-/* the top bar of one of the port's own screens (menu_extra.bin's titles 20 .. 23: key bindings, volume, meter and BGM, HUD options): 1 when drawn, else
+/* the top bar of one of the port's own screens (menu_extra.bin's titles 20 .. 26: key bindings, volume, meter and BGM, HUD options, information, debug options, vibration): 1 when drawn, else
  * the caller puts its words */
 static int draw_title_bar(int bars, int k) {
   int s = anm_sprite(110100 + 20 + k);
@@ -2216,7 +2216,8 @@ static void draw_layout(const menu_state *m, int clock, float screen_w, float sc
  * each time (the graphics rows the build offers: Android's, an iPad's resolution). The touch controls are the CONTROLS screen's. ---- */
 static int option_touch(void) { return hud_style() == HUD_STYLE_TOUCH; }
 
-enum { OK_SWITCH, OK_MIP, OK_RES, OK_AA, OK_SUB, OK_INFO, OK_RUMBLE, OK_PCT };
+enum { OK_SWITCH, OK_MIP, OK_RES, OK_AA, OK_SUB, OK_INFO, OK_RUMBLE, OK_PCT, OK_WIN };
+#define IS_RES(r) ((r)->kind == OK_RES || (r)->kind == OK_WIN) /* a choice of two, the value the chip (0 the left) */
 #define IS_SUB(r) ((r)->kind == OK_SUB || (r)->kind == OK_INFO || (r)->kind == OK_RUMBLE) /* a row that is a button to another screen */
 typedef struct { const char *name, *note; int kind; int *v; } orow;
 
@@ -2233,7 +2234,7 @@ static float optl_dy(int n) { return n > 9 ? 25.0f : OPTL_DY; }
 
 /* a row's chip c: its left edge and width */
 static void optl_chip(const orow *r, int c, float *x, float *w) {
-  float w0 = r->kind == OK_RES ? 112.0f : IS_SUB(r) ? 110.0f : 70.0f;
+  float w0 = IS_RES(r) ? 112.0f : IS_SUB(r) ? 110.0f : 70.0f;
   *w = w0, *x = OPTL_X_ON + (w0 + OPTL_GAP) * (float)c;
 }
 
@@ -2249,6 +2250,7 @@ static int option_rows(menu_state *m, orow r[12]) {
     r[n++] = (orow){ "ANTI-ALIASING", "MSAA: SMOOTHS HARD EDGES", OK_AA, &m->aa4 };
   }
   if (m->res_row) r[n++] = (orow){ "RESOLUTION", "TAKES EFFECT AT THE NEXT START", OK_RES, &m->hires };
+  if (m->win_row) r[n++] = (orow){ "WINDOW MODE", "WINDOWED OR FULLSCREEN (F11 OR ALT+ENTER ANYTIME)", OK_WIN, &m->fullscreen };
   r[n++] = (orow){ "VIBRATION", "CONTROLLER RUMBLE: WALL HITS, EXPANSION JOINTS AND TIRE SLIP", OK_RUMBLE, NULL };
   r[n++] = (orow){ "DEBUG OPTIONS", "ADDITIONAL INFORMATION READOUTS", OK_SUB, NULL };
   r[n++] = (orow){ "INFORMATION", "ABOUT THIS PORT", OK_INFO, NULL };
@@ -2285,7 +2287,7 @@ static void optl_chip_set(menu_state *m, const orow *r, int c) {
     snd_menu(SND_CURSOR);
     return;
   }
-  int want = r->kind == OK_RES ? c : c == 0; /* (RESOLUTION: the first or the second; the others: ON / 4X is the left) */
+  int want = IS_RES(r) ? c : c == 0; /* (RESOLUTION: the first or the second; the others: ON / 4X is the left) */
   if (*r->v == want) return;
   *r->v = want, m->garage_changed = 1;
   snd_menu(SND_CURSOR);
@@ -2310,7 +2312,7 @@ static int optl_step(menu_state *m, const orow *rows, int n, int *sel, const men
     if (IS_SUB(r)) return 1;
     if (r->kind == OK_MIP) m->mip = (m->mip + 1) % 4, m->garage_changed = 1, snd_menu(SND_CURSOR);
     else if (r->kind == OK_PCT) *r->v = (*r->v + 1) % 11, m->garage_changed = 1, snd_menu(SND_CURSOR);
-    else optl_chip_set(m, r, r->kind == OK_RES ? !*r->v : (*r->v ? 1 : 0));
+    else optl_chip_set(m, r, IS_RES(r) ? !*r->v : (*r->v ? 1 : 0));
   }
   return 0;
 }
@@ -2349,12 +2351,12 @@ static void draw_optlist(const menu_state *m, const orow *rows, int n, int sel, 
     for (int c = 0; c < (IS_SUB(o) ? 1 : 2); ++c) {
       float x, w;
       optl_chip(o, c, &x, &w);
-      int lit = o->kind == OK_MIP || o->kind == OK_PCT || IS_SUB(o) ? 1 : o->kind == OK_RES ? on == c : on == !c;
+      int lit = o->kind == OK_MIP || o->kind == OK_PCT || IS_SUB(o) ? 1 : IS_RES(o) ? on == c : on == !c;
       hud_ui_rect(x * k, (y - 0.5f * chip_h) * k, w * k, chip_h * k, lit ? 0.35f : 0.0f, lit ? 0.15f : 0.0f, 0.0f, lit ? 0.9f : 0.4f);
       if (lit) hud_ui_rect(x * k, (y + 0.5f * chip_h - 2.0f) * k, w * k, 2.0f, 1.0f, 0.42f, 0.05f, 1.0f);
-      const char *s = IS_SUB(o) ? "OPEN >" : o->kind == OK_MIP ? (c ? "SHARPER" : "SOFTER") : o->kind == OK_PCT ? (c ? "MORE" : "LESS") : o->kind == OK_RES ? (m->res_phone ? (c ? "960 X 640" : "480 X 320") : (c ? "2048 X 1536" : "1024 X 768"))
+      const char *s = IS_SUB(o) ? "OPEN >" : o->kind == OK_MIP ? (c ? "SHARPER" : "SOFTER") : o->kind == OK_PCT ? (c ? "MORE" : "LESS") : o->kind == OK_WIN ? (c ? "FULLSCREEN" : "WINDOWED") : o->kind == OK_RES ? (m->res_phone ? (c ? "960 X 640" : "480 X 320") : (c ? "2048 X 1536" : "1024 X 768"))
                     : o->kind == OK_AA ? (c ? "2X" : "4X") : c ? "OFF" : "ON";
-      float px = o->kind == OK_MIP || o->kind == OK_RES || o->kind == OK_PCT ? 1.8f : chip_px;
+      float px = o->kind == OK_MIP || IS_RES(o) || o->kind == OK_PCT ? 1.8f : chip_px;
       hud_ui_text(s, (x + 0.5f * w) * k - 0.5f * hud_ui_text_width(s, px), y * k - 3.5f * px, px, 1, 1, 1, lit ? 1.0f : 0.45f);
     }
     if (o->kind == OK_MIP || o->kind == OK_PCT) {
@@ -2422,11 +2424,10 @@ static void draw_rumble(const menu_state *m, int clock, int bars, float screen_w
   const float k = 1.6f;
   draw_back(ID.bg, clock % 600, 1);
   anm_draw(ID.line, clock % anm_frames(ID.line), 1);
-  anm_swap title = { anm_sprite(T_TOPBAR_MES), -1 };
-  draw_topbar(bars, 1, &title);
   draw_bottom(bars, 1);
+  int tb = draw_title_bar(bars, 6);
   hud_ui_begin(screen_w, screen_h);
-  hud_ui_text("VIBRATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
+  if (!tb) hud_ui_text("VIBRATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
   hud_ui_end();
   orow r[4];
   int n = rumble_rows((menu_state *)m, r);
@@ -2445,7 +2446,7 @@ static void option_step(menu_state *m, const menu_in *in) {
   }
 }
 
-/* ---- the port's information screen (MENU_PORTINFO, the game options' INFORMATION): the credits, more to come ---- */
+/* ---- the port's information screen (MENU_PORTINFO, the game options' INFORMATION): the credits and notice ---- */
 static void portinfo_step(menu_state *m, const menu_in *in) {
   if (!in->back && !in->ok) return;
   snd_menu(SND_CANCEL);
@@ -2456,18 +2457,34 @@ static void draw_portinfo(const menu_state *m, int clock, int bars, float screen
   const float k = 1.6f;
   draw_back(ID.bg, clock % 600, 1);
   anm_draw(ID.line, clock % anm_frames(ID.line), 1);
-  anm_swap title = { anm_sprite(T_TOPBAR_MES), -1 };
-  draw_topbar(bars, 1, &title);
   draw_bottom(bars, 1);
+  int tb = draw_title_bar(bars, 4);
   hud_ui_begin(screen_w, screen_h);
-  hud_ui_text("INFORMATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
+  if (!tb) hud_ui_text("INFORMATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
+  /* (a line starting with # is a heading) */
   static const char *const lines[] = {
-    "SUPER3DX+", "AN UNOFFICIAL, NON-COMMERCIAL FAN PORT.", "", "BASED ON RE3DX+ BY ALLANNN-SUDO",
-    "(GITHUB: ALLANNN-SUDO), MIT LICENCE.", "", "WANGAN MIDNIGHT MAXIMUM TUNE 3DX+ AND ITS NAMES, ART,",
-    "MUSIC AND SOUND BELONG TO THEIR OWNERS.", "NO GAME CONTENT IS INCLUDED.",
+    "#SUPER3DX+",
+    "A CONSOLE-STYLE PORT OF WANGAN MIDNIGHT MAXIMUM TUNE",
+    "3DX+: CONTROLLER FIRST, WITH LAN AND ONLINE VERSUS,",
+    "CONTROLLER VIBRATION AND A RASPBERRY PI 5 CRT BUILD.",
+    "",
+    "#CREDITS",
+    "BASED ON RE3DX+ BY ALLANNN-SUDO (MIT LICENCE).",
+    "THE CONSOLE PORT BY SMOLDERYGUEST.",
+    "GITHUB.COM/SMOLDERYGUEST/SUPER3DXPLUS",
+    "",
+    "#NOTICE",
+    "AN UNOFFICIAL, NON-COMMERCIAL FAN PORT. WANGAN MIDNIGHT",
+    "MAXIMUM TUNE 3DX+ AND ITS NAMES, ART, MUSIC AND SOUND",
+    "BELONG TO THEIR OWNERS. NO GAME CONTENT IS INCLUDED:",
+    "THE GAME RUNS ON DATA MADE FROM YOUR OWN COPY.",
   };
-  for (int i = 0; i < (int)(sizeof lines / sizeof *lines); i++)
-    hud_ui_text(lines[i], 24.0f * k, (110.0f + 26.0f * i) * k, 1.6f, 0.85f, 0.85f, 0.85f, 1);
+  float y = 92.0f;
+  for (int i = 0; i < (int)(sizeof lines / sizeof *lines); i++, y += 20.0f) {
+    const char *s = lines[i];
+    if (*s == '#') hud_ui_text(s + 1, 24.0f * k, y * k, 2.9f, 1.0f, 0.55f, 0.15f, 1);
+    else hud_ui_text(s, 24.0f * k, y * k, 2.2f, 0.9f, 0.9f, 0.9f, 1);
+  }
   hud_ui_end();
 }
 
@@ -2497,11 +2514,10 @@ static void draw_hudopt(const menu_state *m, int clock, int bars, float screen_w
   const float k = 1.6f;
   draw_back(ID.bg, clock % 600, 1);
   anm_draw(ID.line, clock % anm_frames(ID.line), 1);
-  anm_swap title = { anm_sprite(T_TOPBAR_MES), -1 };
-  draw_topbar(bars, 1, &title);
   draw_bottom(bars, 1);
+  int tb = draw_title_bar(bars, 5);
   hud_ui_begin(screen_w, screen_h);
-  hud_ui_text("DEBUG OPTIONS", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
+  if (!tb) hud_ui_text("DEBUG OPTIONS", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
   hud_ui_end();
   orow r[4];
   int n = debug_rows((menu_state *)m, r);
@@ -6888,7 +6904,7 @@ void menu_init(menu_state *m) {
   for (int i = 0; i < 4; ++i) m->vol[i] = 10; /* (the volume mixer, full, but the overall level at half) */
   m->vol[0] = 5;
   m->ten_beep = 1;
-  m->rum[0] = 10, m->rum[1] = 10, m->rum[2] = 10, m->rum[3] = 8;
+  m->rum[0] = 8, m->rum[1] = 10, m->rum[2] = 10, m->rum[3] = 5;
   m->mip = 2;
   /* (the SSAO off: its 20 ms on the Mi 6 cost the 60 fps) */
   m->hd_tex = 1, m->bloom_on = 0, m->ssao_on = 0, m->wet_on = 0, m->paint_on = 1, m->aa4 = 0;

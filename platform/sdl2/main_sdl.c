@@ -50,6 +50,8 @@ static struct {
   input_ev ev[EV_MAX];
   int n_ev, quit, win_w, win_h, exit_req;
   int hud_touch; /* --hud touch: the race with the iPad's touch keys (hud_set_style) */
+  volatile int fs_want, fs_now; /* the window mode the app wants (0 windowed, 1 fullscreen) and the one the window is in: the event thread switches it */
+  int fs_cli;                    /* --fullscreen on the command line */
   volatile int resized; /* the window changed size: the game thread tells the app (app_resize) between frames */
   char data_dir[1024], save_dir[1024];
   const char *bgm;
@@ -482,6 +484,10 @@ static int game(void *arg) {
     P.fail = 1;
     return 0;
   }
+  if (P.fs_cli) app_set_fullscreen(1); /* (the command line over the saved mode) */
+#if !defined(__aarch64__) && !defined(__arm__)
+  if (!CRT.on) app_window_row(1); /* the game options get a WINDOW MODE row (the Pi's kiosk has no windows) */
+#endif
   bgm_init(P.data_dir);
   audio_open();
   if (P.load_ctx) {
@@ -521,6 +527,7 @@ static int game(void *arg) {
       else if (ev[i].kind == 4) app_readout(-1);
       else if (ev[i].kind == 5) app_phys(-1);
       else if (ev[i].kind == 6) app_tune(-1);
+      else if (ev[i].kind == 7) app_set_fullscreen(!app_fullscreen()); /* F11, Alt+Enter */
       else if (ev[i].kind == 2) app_input(ev[i].phase, ev[i].code, ev[i].flags & 1, ev[i].flags >> 1); /* (the bindings) */
       else app_touch((void *)(intptr_t)1, ev[i].phase, ev[i].x, ev[i].y);
     }
@@ -538,6 +545,7 @@ static int game(void *arg) {
       app_key(APP_KEY_BRAKE, brake);
     }
     app_frame(dt);
+    P.fs_want = app_fullscreen();
     pad_rumble_frame();
     /* the attract loop's movies (movie.c: data_dir/intro.wmv, playdemo.wmv, tutorial.wmv); one that is not there ends at once */
     int want = app_movie();
@@ -845,6 +853,7 @@ int main(int argc, char **argv) {
   }
   /* a desktop window opens at a size worth looking at (the layout is 4:3); --size, the CRT and the Pi's fullscreen set their own */
   if (!sized && !fullscreen && !CRT.on) w = 1280, h = 960;
+  P.fs_cli = P.fs_now = P.fs_want = fullscreen;
   snprintf(P.data_dir, sizeof P.data_dir, "%s", data);
   snprintf(P.save_dir, sizeof P.save_dir, "%s", save ? save : data);
   setvbuf(stderr, NULL, _IOLBF, 0);
@@ -972,6 +981,11 @@ int main(int argc, char **argv) {
         break;
       }
     }
+    if (P.fs_want != P.fs_now) { /* the window mode the game options (or F11) chose */
+      P.fs_now = P.fs_want;
+      fprintf(stderr, "window mode: %s\n", P.fs_now ? "fullscreen" : "windowed");
+      SDL_SetWindowFullscreen(P.win, P.fs_now ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    }
     if (!SDL_WaitEventTimeout(&e, 50)) continue;
     switch (e.type) {
     case SDL_QUIT: P.quit = 1; break;
@@ -1012,6 +1026,7 @@ int main(int argc, char **argv) {
       if (down && !e.key.repeat && sym == SDLK_F3 && !app_bind_capturing()) push_ev(4, 0, 0, 0); /* F3: the input readout on and off */
       if (down && !e.key.repeat && sym == SDLK_F4 && !app_bind_capturing()) push_ev(5, 0, 0, 0); /* F4: the physics panel on and off */
       if (down && !e.key.repeat && sym == SDLK_F5 && !app_bind_capturing()) push_ev(6, 0, 0, 0); /* F5: the steering filter's tuning panel */
+      if (down && !e.key.repeat && (sym == SDLK_F11 || (sym == SDLK_RETURN && (e.key.keysym.mod & KMOD_ALT))) && !app_bind_capturing()) push_ev(7, 0, 0, 0); /* F11 or Alt+Enter: windowed or fullscreen */
       if (getenv("MT3DX_LOG")) fprintf(stderr, "input: key %d %s\n", sym, down ? "down" : "up");
       push_input(BIND_KEY, sym, down | (e.key.repeat ? 2 : 0));
       break;

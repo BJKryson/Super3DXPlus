@@ -211,6 +211,7 @@ typedef struct {
   /* and on an iPad (res_row, set by the app), the screen's resolution: 1024x768 (0) or the
    * Retina iPads' 2048x1536 (1), from the next start (main.m reads it from the options) */
   int res_row, hires, res_phone;
+  int win_row, fullscreen; /* the PC player's WINDOW MODE row (win_row), and the mode: 0 windowed, 1 fullscreen */
   /* the gear key pressed; the maker under the cursor meanwhile; the screen it was pressed on
    * (the maker select or the SAVE DATA screen) */
   int option, opt_sel, opt_from;
