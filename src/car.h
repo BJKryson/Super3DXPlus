@@ -217,6 +217,7 @@ void car_phys_debug(int on);
  *     bent towards its cube, up to counter / 10 of the way: a small tap gives less, the stick's whole reach still gives full lock. 0 leaves it as it is.
  * Takes effect on the next frame. */
 void car_set_filter(int on, int smooth, int counter);
+void car_set_button_steer(int v); /* the keys' and D-pad's steering speed, 1..10 (10: straight to full lock) */
 
 /* the corners: +x is the car's left */
 enum { CAR_FL, CAR_FR, CAR_RL, CAR_RR };

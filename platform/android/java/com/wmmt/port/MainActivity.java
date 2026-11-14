@@ -6,7 +6,12 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.CombinedVibration;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.view.InputDevice;
 import android.view.InputEvent;
 import android.view.KeyEvent;
@@ -452,6 +457,62 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Se
         bgm = null;
       }
     });
+  }
+
+  /* the main menu's EXIT: the activity closed and its task removed, and the process ended a moment after (the game thread runs on in it otherwise,
+   * and a second start would find the game "going on" without a window) */
+  void exitApp() {
+    runOnUiThread(() -> {
+      finishAndRemoveTask();
+      new Handler().postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 400);
+    });
+  }
+
+  /* the pad's rumble (haptic.c: low = the strong motor, high = the weak one, 0..1; the game thread repeats it every 80 ms while it is on, so each
+   * call lasts 120 ms and 0 stops it): the game pads' own vibrators (a pad with two motors gets one each, the Retroid's built-in controller
+   * too, as Android lists it), or the phone's vibrator when no pad has one */
+  void rumble(final float lo, final float hi) {
+    try {
+      boolean on = lo > 0.0f || hi > 0.0f;
+      boolean any = false;
+      if (Build.VERSION.SDK_INT >= 31) {
+        for (int id : InputDevice.getDeviceIds()) {
+          InputDevice d = InputDevice.getDevice(id);
+          if (d == null) continue;
+          int s = d.getSources();
+          if ((s & InputDevice.SOURCE_GAMEPAD) != InputDevice.SOURCE_GAMEPAD && (s & InputDevice.SOURCE_JOYSTICK) != InputDevice.SOURCE_JOYSTICK) continue;
+          VibratorManager vm = d.getVibratorManager();
+          int[] ids = vm.getVibratorIds();
+          if (ids.length == 0) continue;
+          any = true;
+          if (!on) {
+            vm.cancel();
+            continue;
+          }
+          CombinedVibration.ParallelCombination pc = CombinedVibration.startParallel();
+          int n = 0;
+          for (int i = 0; i < ids.length; ++i) {
+            float v = ids.length > 1 ? (i == 0 ? lo : hi) : Math.max(lo, hi);
+            if (v <= 0.0f) continue;
+            pc.addVibrator(ids[i], VibrationEffect.createOneShot(120, Math.max(1, Math.min(255, Math.round(v * 255.0f)))));
+            ++n;
+          }
+          if (n > 0) vm.vibrate(pc.combine());
+        }
+      }
+      if (any) return;
+      Vibrator vib = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+      if (vib == null || !vib.hasVibrator()) return;
+      if (!on) {
+        vib.cancel();
+      } else if (Build.VERSION.SDK_INT >= 26) {
+        float v = Math.max(lo, hi);
+        vib.vibrate(vib.hasAmplitudeControl() ? VibrationEffect.createOneShot(120, Math.max(1, Math.min(255, Math.round(v * 255.0f))))
+                                              : VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE));
+      }
+    } catch (Exception e) {
+      /* (a pad that refuses: no rumble) */
+    }
   }
 
   /* the BGM's level (the story ending's fade out; a new track starts at full) */

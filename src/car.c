@@ -1402,7 +1402,8 @@ static void read_phys(car_state *c, const float v[3], const float pv[3], int hav
             p->tyre_angle * 57.2958f, p->tyre_ratio, p->tyre_load, p->load_ratio, p->f_lat, p->peak_lat, p->f_long, p->peak_long, MF(P.gin), MF(P.m + 0xb04), MF(P.m + 0xb08), MF(P.m + 0xb0c));
 }
 
-static int filt_on, filt_smooth, filt_counter;
+static int filt_on, filt_smooth, filt_counter, btn_steer = 10;
+void car_set_button_steer(int v) { btn_steer = v < 1 ? 1 : v > 10 ? 10 : v; }
 void car_set_filter(int on, int smooth, int counter) {
   filt_on = on != 0;
   filt_smooth = smooth < 0 ? 0 : smooth > 20 ? 20 : smooth;
@@ -1416,6 +1417,21 @@ void car_update(car_state *c, const car_input *in) {
    * wheel goes; the tilt is a wheel already, followed closely */
   float target = in->steer;
   c->steer_in = target;
+  {
+    /* the buttons (keys, the D-pad): the push builds up at BUTTON STEERING SPEED (1..10: turn in at 0.6 x it, centre at 1.6 x it, in lock-widths a
+     * second; 10 is straight to full lock as before), before the filter or the direct rate; an analog input goes through as it is */
+    static float held;
+    if (in->analog || btn_steer >= 10) {
+      held = target;
+    } else {
+      float rate = fabsf(target) > fabsf(held) && target * held >= 0 ? 0.6f * (float)btn_steer : 1.6f * (float)btn_steer;
+      float ds = target - held;
+      if (ds > rate / 60.0f) ds = rate / 60.0f;
+      if (ds < -rate / 60.0f) ds = -rate / 60.0f;
+      held += ds;
+    }
+    target = held;
+  }
   if (filt_on) {
     /* filtered: first the counter-steer mapping (while the car slides, a push towards the way it is going is bent towards its cube); then a first-order
      *

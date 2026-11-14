@@ -213,8 +213,6 @@ the garage right after the load (a round-trip test).
   in both builds' data folders; the race HUD's map shows the road and the route in Osaka, Nagoya, Fukuoka and Hakone. `pipeline.py convert`
   should make them too.
 
-See `FEASIBILITY.md` for the input filtering, force feedback and rumble assessment.
-
 ## Fixes of Nov 4 (night)
 
 - **Prologue.** The prologue has two parts. The English build shows the first (English) and skips the second (the 20XX text in Japanese); Japan shows both. (`WMMT_LANG_EN` is defined as 0 in the Japan build: test it with `#if`, not `#ifdef`.)

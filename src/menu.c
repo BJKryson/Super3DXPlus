@@ -2463,21 +2463,22 @@ static void draw_portinfo(const menu_state *m, int clock, int bars, float screen
   if (!tb) hud_ui_text("INFORMATION", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
   /* (a line starting with # is a heading) */
   static const char *const lines[] = {
-    "#SUPER3DX+",
-    "A CONSOLE-STYLE PORT OF WANGAN MIDNIGHT MAXIMUM TUNE",
-    "3DX+: CONTROLLER FIRST, WITH LAN AND ONLINE VERSUS,",
-    "CONTROLLER VIBRATION AND A RASPBERRY PI 5 CRT BUILD.",
+    "#SUPER 3DX+",
+    "A NATIVE, CONSOLE-STYLE PORT OF WANGAN MIDNIGHT MAXIMUM TUNE",
+    "3DX+ WITH CONTROLLER SUPPORT, OVERHAULED MENUS AND GARAGE,",
+    "A MOUNTAIN OF BUGFIXES, RESTORATIONS, AND MORE.",
     "",
     "#CREDITS",
-    "BASED ON RE3DX+ BY ALLANNN-SUDO (MIT LICENCE).",
-    "THE CONSOLE PORT BY SMOLDERYGUEST.",
+    "DEVELOPED BY SMOLDERYGUEST.",
     "GITHUB.COM/SMOLDERYGUEST/SUPER3DXPLUS",
+    "X.COM/SMOLDERYGUEST",
+    "BASED ON RE3DX+ BY ALLANNN-SUDO (MIT LICENCE).",
     "",
     "#NOTICE",
-    "AN UNOFFICIAL, NON-COMMERCIAL FAN PORT. WANGAN MIDNIGHT",
-    "MAXIMUM TUNE 3DX+ AND ITS NAMES, ART, MUSIC AND SOUND",
-    "BELONG TO THEIR OWNERS. NO GAME CONTENT IS INCLUDED:",
-    "THE GAME RUNS ON DATA MADE FROM YOUR OWN COPY.",
+    "WANGAN MIDNIGHT MAXIMUM TUNE IS A TRADEMARK OF BANDAI",
+    "NAMCO ENTERTAINMENT, INC. THIS IS AN UNOFFICIAL FAN",
+    "PROJECT AND IS NOT AFFILIATED IN ANY WAY, SHAPE OR FORM,",
+    "WRITTEN OR IMPLIED.",
   };
   float y = 92.0f;
   for (int i = 0; i < (int)(sizeof lines / sizeof *lines); i++, y += 20.0f) {
@@ -2616,13 +2617,19 @@ static void draw_volume(const menu_state *m, int clock, int bars, float screen_w
 #define BIND_ROW_DY 23.0f
 #define BIND_Y_TAB 90.0f
 static const char *const BIND_TAB[BIND_CONTEXTS + 1] = { "MENUS", "RACE", "AXES" }; /* (the third list is the analog axes: BA_*) */
-static int bind_rows(int ctx) { return ctx == BIND_CONTEXTS ? BA_COUNT + 3 : bind_actions(ctx); } /* (the AXES list: the axes, then the steering filter's switch and its two numbers) */
+/* the RACE list has one row that is no action, under STEER LEFT / RIGHT: BUTTON STEERING SPEED (RS_ROW); the rows past it are the actions one on */
+#define RS_ROW 2
+static int bind_act(int ctx, int row) { return ctx == BIND_RACE && row > RS_ROW ? row - 1 : row; }
+static int bind_is_speed(int ctx, int row) { return ctx == BIND_RACE && row == RS_ROW; }
+static int bind_rows(int ctx) { return ctx == BIND_CONTEXTS ? BA_COUNT + 3 : ctx == BIND_RACE ? bind_actions(ctx) + 1 : bind_actions(ctx); } /* (the AXES list: the axes, then the steering filter's switch and its two numbers) */
 /* the filter's number of a row of the AXES list past the switch (half steps, 0..20) */
-static int *filter_value(menu_state *m, int row) { return row == BA_COUNT + 1 ? &m->filter_smooth : &m->filter_counter; }
+static int *filter_value(menu_state *m, int row) {
+  return row == BA_COUNT + 1 ? &m->filter_smooth : row == BA_COUNT + 2 ? &m->filter_counter : &m->btn_steer; /* (+3: the buttons' steering speed, 1..10, whole steps) */
+}
 static void filter_step(menu_state *m, int row, int by, int wrap) {
-  int *v = filter_value(m, row), to = *v + by;
-  if (to > 20) to = wrap ? 0 : 20;
-  if (to < 0) to = 0;
+  int *v = filter_value(m, row), to = *v + by, hi = row == BA_COUNT + 3 ? 10 : 20, lo = row == BA_COUNT + 3 ? 1 : 0;
+  if (to > hi) to = wrap ? lo : hi;
+  if (to < lo) to = lo;
   if (to != *v) *v = to, m->garage_changed = 1, snd_menu(SND_CURSOR);
 }
 static const int BIND_DEAD[] = { 0, 2, 5, 8, 10, 15, 20, 25, 30, 40 };
@@ -2679,6 +2686,8 @@ void menu_bind_capture(menu_state *m, int kind, int code) {
     }
     return;
   }
+  if (bind_is_speed(ctx, row)) return;
+  row = bind_act(ctx, row);
   if (row >= bind_actions(ctx)) return;
   if (kind == BIND_KEY && code == BK_ESCAPE && m->bind_wait) {
     m->bind_wait = 0;
@@ -2923,6 +2932,14 @@ static void bindings_step(menu_state *m, const menu_in *in) {
     snd_menu(SND_CURSOR);
     return;
   }
+  if (in->dx && bind_is_speed(m->bind_ctx, m->bind_row)) { /* the buttons' steering speed: left and right step it */
+    filter_step(m, BA_COUNT + 3, in->dx, 0);
+    return;
+  }
+  if (in->ok && bind_is_speed(m->bind_ctx, m->bind_row)) {
+    filter_step(m, BA_COUNT + 3, 1, 1);
+    return;
+  }
   if (in->dx && m->bind_ctx == BIND_CONTEXTS && m->bind_row > BA_COUNT && m->bind_row < BA_COUNT + 3) { /* a number of the filter: left and right step it by 0.5 */
     filter_step(m, m->bind_row, in->dx, 0);
     return;
@@ -2965,7 +2982,7 @@ static void bindings_step(menu_state *m, const menu_in *in) {
     }
     if (m->bind_row >= n) { /* the list's defaults */
       if (m->bind_ctx == BIND_CONTEXTS) bind_axes_defaults();
-      else bind_context_defaults(m->bind_ctx);
+      else bind_context_defaults(m->bind_ctx), m->btn_steer = m->bind_ctx == BIND_RACE ? 10 : m->btn_steer;
       m->garage_changed = 1;
       bindings_note(m, "DEFAULTS BACK");
       snd_menu(SND_SELECT);
@@ -3032,10 +3049,12 @@ static void draw_bindings(const menu_state *m, int clock, int bars, float screen
         continue;
       }
       if (r > BA_COUNT && r < BA_COUNT + 3) { /* the filter's smoothing and countersteer feel: < value > */
-        static const char *const FN[2] = { "SMOOTHING", "COUNTERSTEER FEEL" };
-        hud_ui_text(FN[r - BA_COUNT - 1], BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, m->filter_on ? 1.0f : 0.55f);
+        static const char *const FN[3] = { "SMOOTHING", "COUNTERSTEER FEEL", "BUTTON STEERING SPEED" };
+        int btn = r == BA_COUNT + 3;
+        hud_ui_text(FN[r - BA_COUNT - 1], BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, m->filter_on || btn ? 1.0f : 0.55f);
         char vt[24];
-        snprintf(vt, sizeof vt, "< %.1f >", (float)*filter_value((menu_state *)m, r) * 0.5f);
+        if (btn) snprintf(vt, sizeof vt, "< %d >", m->btn_steer);
+        else snprintf(vt, sizeof vt, "< %.1f >", (float)*filter_value((menu_state *)m, r) * 0.5f);
         hud_ui_rect(AX_X[0] * k, (y + 1.0f) * k, AX_W[0] * k, (BIND_ROW_DY - 4.0f) * k, row_on ? 0.35f : 0.0f, row_on ? 0.15f : 0.0f, 0.0f, row_on ? 0.85f : 0.4f);
         if (row_on) hud_ui_rect(AX_X[0] * k, (y + 1.0f) * k, AX_W[0] * k, 2.0f, 1.0f, 0.42f, 0.05f, 1.0f);
         hud_ui_text(vt, (AX_X[0] + 0.5f * AX_W[0]) * k - 0.5f * hud_ui_text_width(vt, 1.9f), (y + 5.0f) * k, 1.9f, 1, 1, 1, 1);
@@ -3073,7 +3092,7 @@ static void draw_bindings(const menu_state *m, int clock, int bars, float screen
       }
     }
     const char *ahint = m->bind_wait ? "MOVE A STICK OR PULL A TRIGGER   ANY BUTTON CANCELS" : "PRESS VIEW TO SWITCH CATEGORY";
-    hud_ui_text(m->bind_note[0] ? m->bind_note : ahint, 20.0f * k, 380.0f * k, 1.7f, 0.85f, 0.85f, 0.85f, 1);
+    hud_ui_text(m->bind_note[0] ? m->bind_note : ahint, 20.0f * k, 388.0f * k, 1.7f, 0.85f, 0.85f, 0.85f, 1);
     hud_ui_end();
     return;
   }
@@ -3092,13 +3111,26 @@ static void draw_bindings(const menu_state *m, int clock, int bars, float screen
       if (row_on) hud_ui_rect(2.0f * k, y * k, 4.0f * k, (BIND_ROW_DY - 2.0f) * k, 1.0f, 0.42f, 0.05f, 1.0f);
       continue;
     }
-    hud_ui_text(bind_action_name(ctx, r), BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, 1);
+    if (bind_is_speed(ctx, r)) { /* not an action: < speed > in the first cell's place */
+      hud_ui_text("BUTTON STEERING SPEED", BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, 1);
+      if (row_on) hud_ui_rect(2.0f * k, y * k, 4.0f * k, (BIND_ROW_DY - 2.0f) * k, 1.0f, 0.42f, 0.05f, 1.0f);
+      float x, w;
+      bindings_cell(0, &x, &w);
+      char vt[16];
+      snprintf(vt, sizeof vt, "< %d >", m->btn_steer);
+      hud_ui_rect(x * k, (y + 1.0f) * k, w * k, (BIND_ROW_DY - 4.0f) * k, row_on ? 0.35f : 0.0f, row_on ? 0.15f : 0.0f, 0.0f, row_on ? 0.85f : 0.4f);
+      if (row_on) hud_ui_rect(x * k, (y + 1.0f) * k, w * k, 2.0f, 1.0f, 0.42f, 0.05f, 1.0f);
+      hud_ui_text(vt, (x + 0.5f * w) * k - 0.5f * hud_ui_text_width(vt, 1.9f), (y + 5.0f) * k, 1.9f, 1, 1, 1, 1);
+      continue;
+    }
+    int ra = bind_act(ctx, r); /* (the action of the row) */
+    hud_ui_text(bind_action_name(ctx, ra), BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, 1);
     if (row_on) hud_ui_rect(2.0f * k, y * k, 4.0f * k, (BIND_ROW_DY - 2.0f) * k, 1.0f, 0.42f, 0.05f, 1.0f);
     for (int s = 0; s < BIND_SLOTS; ++s) {
       float x, w;
       bindings_cell(s, &x, &w);
       int on = row_on && s == m->bind_col;
-      const bind_slot *b = bind_get(ctx, r, s);
+      const bind_slot *b = bind_get(ctx, ra, s);
       hud_ui_rect(x * k, (y + 1.0f) * k, w * k, (BIND_ROW_DY - 4.0f) * k, on ? 0.35f : 0.0f, on ? 0.15f : 0.0f, 0.0f, on ? 0.85f : 0.4f);
       if (on) { /* the cell: an orange frame (the wait: filled) */
         float a = m->bind_wait ? 0.55f + 0.25f * cosf((float)clock * 0.2f) : 0.0f;
@@ -3117,7 +3149,7 @@ static void draw_bindings(const menu_state *m, int clock, int bars, float screen
   const char *hint = m->bind_wait ? (m->bind_col < BIND_KEYS ? "PRESS A KEY   ESC OR ANY OTHER INPUT CANCELS"
                                                               : "PRESS A PAD BUTTON, THE STICK OR A TRIGGER   ANY KEY CANCELS")
                                   : "PRESS VIEW TO SWITCH CATEGORY";
-  hud_ui_text(m->bind_note[0] ? m->bind_note : hint, 20.0f * k, 380.0f * k, 1.7f, m->bind_note[0] ? 1.0f : 0.85f, m->bind_note[0] ? 0.7f : 0.85f,
+  hud_ui_text(m->bind_note[0] ? m->bind_note : hint, 20.0f * k, 388.0f * k, 1.7f, m->bind_note[0] ? 1.0f : 0.85f, m->bind_note[0] ? 0.7f : 0.85f,
               m->bind_note[0] ? 0.3f : 0.85f, 1);
   hud_ui_end();
 }
@@ -6898,7 +6930,7 @@ void menu_init(menu_state *m) {
   m->zone = 0;
   m->zones = 1;
   menu_garage_reset(m);
-  m->gyro = 0, m->gyro_sens = 5, m->over_on = 1, m->sharp_on = 0, m->ao_on = 0, m->bm_on = 1, m->readout_on = 0, m->fps_on = 0, m->phys_on = 0, m->filter_on = 1, m->filter_smooth = 10, m->filter_counter = 5;
+  m->gyro = 0, m->gyro_sens = 5, m->over_on = 1, m->sharp_on = 0, m->ao_on = 0, m->bm_on = 1, m->readout_on = 0, m->fps_on = 0, m->phys_on = 0, m->filter_on = 1, m->filter_smooth = 10, m->filter_counter = 5, m->btn_steer = 10;
   for (int g = 0; g < 3; ++g) m->key_k[g] = 100, m->key_dx[g] = m->key_dy[g] = 0;
   m->poem = -1;
   for (int i = 0; i < 4; ++i) m->vol[i] = 10; /* (the volume mixer, full, but the overall level at half) */
@@ -10399,6 +10431,14 @@ static int menu_pointer(const menu_state *m, menu_in *in) {
     }
     if (m->bind_ctx == BIND_CONTEXTS && row == BA_COUNT) {
       in->select = row * BIND_SLOTS, in->ok = 1;
+      return 1;
+    }
+    if (bind_is_speed(m->bind_ctx, row)) { /* the buttons' steering speed: the left third of its cell steps it down, the right third up */
+      float cx, cw;
+      bindings_cell(0, &cx, &cw);
+      in->select = row * BIND_SLOTS;
+      if (x >= cx && x < cx + cw / 3.0f) in->dx = -1;
+      else if (x >= cx + cw * 2.0f / 3.0f && x < cx + cw) in->dx = 1;
       return 1;
     }
     if (m->bind_ctx == BIND_CONTEXTS && row > BA_COUNT && row < BA_COUNT + 3) { /* a number of the filter: the left third of its cell steps it down, the right third up */

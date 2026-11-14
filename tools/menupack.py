@@ -632,7 +632,7 @@ def cutin_image_ids(elf):
 
 
 # The story's in-race lines (Cut::clCutIn, data/cutin/jp/CutIn<n>.txt): tools/storycut.py's
-STORYCUT_TEXT_BASE, STORYCUT_FACE_BASE = 120000, 124000
+STORYCUT_TEXT_BASE, STORYCUT_FACE_BASE = 130000, 124000  # (the texts were at 120000: menu_extra.bin's ASCII glyphs, EXF_BASE 120000 + 100 * font + char, replaced the lines 100-194, 200-294, 500-594: one letter each)
 _STORYCUT_TEXTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storycut_texts.txt")
 STORYCUT = [(f[0], int(f[1]), *f[2:]) for f in (l.rstrip("\n").split("\t") for l in (open(
     _STORYCUT_TEXTS, encoding="utf-8") if os.path.exists(_STORYCUT_TEXTS) else ())) if f[0] in ("T", "F")]

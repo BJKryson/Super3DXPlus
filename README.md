@@ -1,62 +1,85 @@
 # Super3DX+
 
-A console-style port of the arcade racing game *Wangan Midnight Maximum Tune 3DX+*: controller first, a menu flow built for a
-couch instead of a touch screen, and a Raspberry Pi 5 that boots straight into the game and outputs 480i composite video to a
-CRT (or, optionally, HDMI). It runs on Windows, Linux, the Pi and Android.
+This an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* built for non-wheel controllers, with a console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo), but the player was rebuilt on SDL2 instead of being Android-only. It supports both the Japan and Export (English) versions of the game, and runs on:
 
-It is a fork of [Re3DX+](https://github.com/Allannn-sudo) (MIT): the car physics are statically recompiled from the arcade's own
-executable, and the rendering, menus and sound are rewritten. See `NOTICE.md` for credit, and for what is not here:
-**no game content**. You bring your own copy of the game and build the data from it; nothing taken from the game is in this
-repository, and nothing generated from it either.
+- PC (Windows / Linux)
+- Android
+- Raspberry Pi
 
-## What works
+## Copyright disclaimer
 
-- Time attack, story mode (all episodes, the in-race dialogue), the 10-in-a-row, the garage, dress-up and the card screens, in the
-  Japan and Export (English) builds of 3DX+.
-- Versus over a LAN or through a relay: up to four machines (tested with two and three, PC and Pi), the route choice at a junction with the
-  leader deciding, the last-stretch call, places, disconnect handling, the winner's choice of music. See `docs/VERSUS.md`.
-- Controller (and keyboard) input with remapping, controller vibration (wall hits, expansion joints, tyre slip), the arcade HUD or a touch HUD, the arcade's sound.
-- A Raspberry Pi 5 image path: the game starts at boot on a CRT at 60 fps (`docs/PI.md`).
+This repository does **not** contain any copyrighted content from the original game or from Bandai Namco Entertainment, Inc. or its subsidiaries, and nothing generated from it. It contains only free, open-source (MIT) tools for building the conversion from **your own legally obtained game data**. See [Quick start](#quick-start).
 
-Not done yet, or not tested: controller vibration on pads other than the one it was tried with, the Pi's HDMI output on real hardware, the Buildroot image, some of the story
-extras. `CHANGELOG.md` has the history; `docs/PLAN.md` the plan.
+*Wangan Midnight Maximum Tune* is a trademark of Bandai Namco Entertainment, Inc. This is an UNOFFICIAL, strictly NON-COMMERCIAL fan project and is not affiliated with them in any way, shape or form, written or implied.
+
+**Where can I get the APK / EXE?** You can't. Any pre-built binaries you see online are unauthorized distributions of copyrighted content, and are not affiliated with this project or its developers. Running unsigned executables from strangers is a bad idea anyway. 
+
+## Why not just use an emulator?
+
+This is not an emulator wrapper. The arcade's car physics are statically recompiled from the game's own executable, and everything else (rendering, menus, sound, netcode) is a ground-up reconstruction. It runs natively and "just works" without emulator setup, and most of the work goes into quality-of-life improvements for setups without a wheel and pedals.
+
+## Why the Pi?
+
+The Raspberry Pi build turns a Pi into an appliance that boots straight into the game over composite video: "what if WMMT3 had a home-console port?" Flash the card, put it in the Pi, play (`docs/PI.md`).
+
+- **Pi 5:** solder a composite video jack onto the J7 pads for composite video, and use a USB sound card for analog audio.
+- **Pi 4 and below:** use a TRRS-to-composite (camcorder style) cable in the headphone jack.
+- **HDMI:** install with `tools/pi/install.sh --hdmi` (or `prep_boot.ps1 -Hdmi`). Untested on real hardware.
+
+Only tested on a Raspberry Pi 5 (8 GB). Other models should work with simple tweaks, but I don't have the hardware to test.
+
+## What's different from Re3DX+
+
+Re3DX+ was touch-only, Japan-only, and basic in functionality. Super3DX+ adds:
+
+- Controller support, with vibration and input filtering
+- Support for both Export and Japan versions
+- Menus and flow reworked for a non-arcade setting, as authentic as possible
+- A rebuilt car save/load system, like a modern Banapass-style garage
+- The original race UI restored, with touch controls optional
+- Restored features: 10 Outrun music, story-mode visual upgrades (roll cages, exhaust, Gatchan's Celsior parts), body color customization, and more
+- Many bug fixes, such as broken texture conversions and missing tuning parts
+
+This only scratches the surface; see `CHANGELOG.md`.
+
+## Status
+
+Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and versus for up to four machines (`docs/VERSUS.md`) work in both builds.
+
+- **Not implemented:** ghost VS battle, the post-race mileage screen, the 10 Outrun post-race rewards / progress screen.
+- **Known bugs:** menu slide/select animations aren't smooth; story rival headlight flare positions are inaccurate (no position data seems to be stored for them); gamepad detection for vibration is a little finicky (basic SDL2 compatibility).
+- **Limitations:** no racing wheel or force feedback support, and classic iOS support was dropped (no equipment to test either).
+- **Cautions:** story mode hasn't been played all the way through. The Japan build is tested much less than Export, since I can't read Japanese; if the text is messed up, please submit an issue.
+- **Maybe later:** rollback netcode for online versus (big undertaking, noticeable performance cost), wheel support.
 
 ## Quick start
 
-You need a dump of the game (a folder with `main` and `data/`; `docs/BUILDS.md` lists the builds that are known to work), Python 3.9
-or newer, and a C compiler. There is no WSL requirement: Windows builds with Zig (one download) or MinGW-w64.
+You need a dump of the game data (a folder with `main` and `data/`; `docs/BUILDS.md` lists known-good builds), Python 3.9+, and a C compiler (on Windows: Zig or MinGW-w64; no WSL needed).
 
 ```sh
 pip install -r tools/requirements.txt
 python build.py doctor                      # what you have and what is missing
-python build.py all /path/to/the/dump       # tables, physics, data (long: an hour or more), the player, a folder to zip
+python build.py all /path/to/the/dump       # tables, physics, data (an hour or more), the player, a folder to zip
 ```
 
-Steps, the options and the other targets (Linux, the Pi, Android) are in `docs/BUILDING.md`. Run the result by double-clicking `super3dx.exe` in the folder, or with
-`build/windows/package/play.bat` (or `play.sh`); the data and the saves live next to it.
+Options and the other targets (Linux, Pi, Android) are in `docs/BUILDING.md`. Run `super3dx.exe` from the output folder, or `build/windows/package/play.bat` (`play.sh`); data and saves live next to it.
 
 ## Layout
 
 ```
-build.py        the build driver (Windows, Linux, macOS)
-src/            the game (platform-neutral C): the physics glue, the race, menus, HUD, render, sound, netcode
-platform/       one folder per target: sdl2/ (PC, Pi), android/, pi/ (the service files)
-tools/          the data pipeline (Python): pipeline.py, the generators, converters and packers; addrs/ the per-build address tables
-test/           desktop tests in C (physics sweep, story start, rival checks)
-third_party/    stb, zlib, the Khronos GLES2 headers (all permissively licensed, each with its own notice)
-docs/           building, testing, the Pi, versus, input, the arcade builds, architecture
+build.py        build driver (Windows, Linux, macOS)
+src/            the game (platform-neutral C)
+platform/       per-target code: sdl2/ (PC, Pi), android/, pi/
+tools/          data pipeline (Python): converters, generators, packers, per-build address tables
+test/           desktop tests in C
+third_party/    stb, zlib, Khronos GLES2 headers (each with its own notice)
+docs/           building, testing, Pi, versus, input, builds, architecture
 ```
 
-## Licence
+## Licence and credits
 
-MIT (`LICENSE`), keeping Re3DX+'s copyright line. Game content is not covered by it and is not here.
+MIT (`LICENSE`), keeping Re3DX+'s copyright line; game content is not covered and not included. See `NOTICE.md`.
 
-## Credits
-
-- **[Re3DX+](https://github.com/Allannn-sudo)** by Allannn-sudo (高橋涼介のFC): the static recompilation of the arcade's physics, and
-  the first rewrite of the rendering, menus, HUD, sound and the data converters. Super3DX+ is built on that work (MIT).
-- **Super3DX+**: the console-style menu flow and controls, the Raspberry Pi 5 / CRT path, the versus netcode, the multi-build support
-  and the build tooling, by [smolderyguest](https://github.com/smolderyguest).
-- The in-game INFORMATION screen (game options) carries the same credits.
-
-*Wangan Midnight Maximum Tune* is a trademark of Bandai Namco; this is an unofficial fan project and is not affiliated with them.
+- **Super3DX+**: developed by [smolderyguest](https://github.com/smolderyguest).
+- **[Re3DX+](https://github.com/Allannn-sudo)** by Allannn-sudo: the original conversion effort, including the static recompilation of the physics and the first rewrite of rendering, menus, HUD, sound and data converters (MIT).
+- **libretro / Lakka-LibreELEC**: reference for the Pi's composite output and filtering method.

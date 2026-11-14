@@ -74,7 +74,7 @@ with open(os.path.join(here, "..", "src", "storycut.h"), "w") as o:
     o.write("#ifndef STORYCUT_H\n#define STORYCUT_H\n\n")
     o.write("/* the story's in-race line files and their rows (Cut::clCutIn::DataLoad's records) */\n")
     o.write("#define STORYCUT_FILES %d\n#define STORYCUT_ROWS %d\n" % (len(files), len(rows)))
-    o.write("#define STORYCUT_TEXT_BASE 120000 /* + text: its pre-rendered line (menupack.py) */\n")
+    o.write("#define STORYCUT_TEXT_BASE 130000 /* + text: its pre-rendered line (menupack.py) */\n")
     o.write("#define STORYCUT_FACE_BASE 124000 /* + face: its face */\n")
     o.write("typedef struct { const char *name; unsigned short first, n; } storycut_file;\n")
     o.write("typedef struct { unsigned short text, face; } storycut_row;\n")

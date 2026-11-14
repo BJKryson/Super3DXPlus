@@ -41,7 +41,8 @@ typedef struct { int axis; int code; float v; } pad_ev;
 static struct {
   JavaVM *vm;
   jobject activity;
-  jmethodID show_movie, play_bgm, bgm_next, bgm_level, fail;
+  jmethodID show_movie, play_bgm, bgm_next, bgm_level, fail, exit_app, rumble;
+  int exit_sent;
   char data_dir[512], save_dir[512];
   pthread_mutex_t mx;
   pthread_cond_t cv;
@@ -324,6 +325,22 @@ static void pad_events(const pad_ev *e, int n) {
     }
 }
 
+/* the pad's rumble (haptic.h through app_rumble, as the SDL player's pad_rumble_frame): sent to MainActivity each frame it changes and again every 80 ms
+ * while it is on (each lasts 120 ms there, so a frozen game lets it die); 0 once when it ends */
+static void pad_rumble_frame(void) {
+  static float sent_lo, sent_hi;
+  static double sent_at;
+  float lo, hi;
+  app_rumble(&lo, &hi);
+  double now = now_s();
+  int on = lo > 0.0f || hi > 0.0f, was = sent_lo > 0.0f || sent_hi > 0.0f;
+  int changed = fabsf(lo - sent_lo) > 0.03f || fabsf(hi - sent_hi) > 0.03f || on != was;
+  if (!changed && !(on && now - sent_at >= 0.08)) return;
+  JNIEnv *env = env_here();
+  (*env)->CallVoidMethod(env, A.activity, A.rumble, (jfloat)lo, (jfloat)hi);
+  sent_lo = lo, sent_hi = hi, sent_at = now;
+}
+
 static void *game(void *arg) {
   env_here();
   if (egl_init() != 0) {
@@ -395,6 +412,11 @@ static void *game(void *arg) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     app_frame(dt);
     sync_movie();
+    pad_rumble_frame();
+    if (app_exit_requested() && !A.exit_sent) { /* the main menu's EXIT: MainActivity closes the app */
+      A.exit_sent = 1;
+      (*env_here())->CallVoidMethod(env_here(), A.activity, A.exit_app);
+    }
     /* depth and stencil need not go out to memory */
     static PFNGLDISCARDFRAMEBUFFEREXTPROC discard_fb;
     if (!discard_fb) discard_fb = (PFNGLDISCARDFRAMEBUFFEREXTPROC)eglGetProcAddress("glDiscardFramebufferEXT");
@@ -429,6 +451,8 @@ JNIEXPORT void JNICALL JFN(nativeStart)(JNIEnv *env, jclass cls, jobject activit
   A.bgm_next = (*env)->GetMethodID(env, cls, "bgmNext", "(Ljava/lang/String;)V");
   A.bgm_level = (*env)->GetMethodID(env, cls, "bgmLevel", "(F)V");
   A.fail = (*env)->GetMethodID(env, cls, "fail", "(Ljava/lang/String;)V");
+  A.exit_app = (*env)->GetMethodID(env, cls, "exitApp", "()V");
+  A.rumble = (*env)->GetMethodID(env, cls, "rumble", "(FF)V");
   const char *d = (*env)->GetStringUTFChars(env, data, NULL), *s = (*env)->GetStringUTFChars(env, save, NULL);
   snprintf(A.data_dir, sizeof A.data_dir, "%s", d);
   snprintf(A.save_dir, sizeof A.save_dir, "%s", s);

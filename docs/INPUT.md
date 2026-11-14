@@ -171,6 +171,12 @@ options file; the back mirror stays on its old line): **INPUT READOUT** (the ste
 mobile HUD's frame rate counter in the arcade HUD, top middle; the touch HUD always shows its own) and **BACK MIRROR**, which moved here from
 the graphics list. Left is ON, right OFF, OK flips, back leaves.
 
+## Button steering speed
+
+KEY BINDINGS > RACE, under STEER LEFT and RIGHT: **BUTTON STEERING SPEED**, 1..10 (a `btnsteer` line of the options file). It only affects steering
+from buttons (keys, the D-pad): the push builds up at 0.6 x the value and releases at 1.6 x it, in full locks a second, before the steering filter
+(an analog stick or the tilt is untouched). 10, the default, goes straight to full lock; lower is gentler. Left and right change it, OK steps up.
+
 ## Vibration
 
 The pad's two rumble motors follow the player's car in a running race (nothing in the menus, the countdown or the pause):

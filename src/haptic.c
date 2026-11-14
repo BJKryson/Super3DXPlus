@@ -82,5 +82,7 @@ void haptic_get(float *low, float *high) {
     }
   }
   *low = clampf(lo * overall, 0.0f, 1.0f);
+  if (*low < 0.03f) *low = 0.0f; /* (the envelopes only fall towards 0: a hair of a rumble would drive a pad's motor at its least for ever) */
   *high = clampf(hi * overall, 0.0f, 1.0f);
+  if (*high < 0.03f) *high = 0.0f;
 }

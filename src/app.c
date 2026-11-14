@@ -1,6 +1,7 @@
 #include "app.h"
 #include "bind.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -1021,6 +1022,8 @@ static int options_load(void) {
     for (int i = 0; i < 4; ++i) G.menu.rum[i] = rm[i] < 0 ? 0 : rm[i] > 10 ? 10 : rm[i];
   int win = 0; /* (the PC player's window mode, after it: 0 windowed, 1 fullscreen) */
   if (n >= 3 && fscanf(f, " window %d", &win) == 1) G.menu.fullscreen = win != 0;
+  int bs = 10; /* (the buttons' steering speed, after it: 1..10) */
+  if (n >= 3 && fscanf(f, " btnsteer %d", &bs) == 1) G.menu.btn_steer = bs < 1 ? 1 : bs > 10 ? 10 : bs;
   fclose(f);
   if (n < 3) return 0;
   G.menu.hires = hires != 0;
@@ -1037,8 +1040,8 @@ static int options_load(void) {
 }
 
 static void options_save(void) {
-  static int last[42] = { -1 };
-  int now[42] = { G.menu.gyro, G.menu.gyro_sens, G.menu.over_on, G.menu.sharp_on, G.menu.pedal_slide, G.menu.ao_on,
+  static int last[43] = { -1 };
+  int now[43] = { G.menu.gyro, G.menu.gyro_sens, G.menu.over_on, G.menu.sharp_on, G.menu.pedal_slide, G.menu.ao_on,
                   G.menu.bm_on, G.menu.hd_tex, G.menu.bloom_on, G.menu.ssao_on, G.menu.wet_on, G.menu.paint_on,
                   G.menu.aa4, G.menu.hires };
   for (int g = 0; g < 3; ++g)
@@ -1049,7 +1052,7 @@ static void options_save(void) {
   now[25] = G.menu.readout_on, now[26] = G.menu.fps_on;
   now[31] = G.menu.ten_beep, now[32] = G.menu.mip;
   now[33] = G.menu.phys_on;
-  now[34] = G.menu.filter_on, now[35] = G.menu.filter_smooth, now[36] = G.menu.filter_counter, now[37] = G.menu.rum[0], now[38] = G.menu.rum[1], now[39] = G.menu.rum[2], now[40] = G.menu.rum[3], now[41] = G.menu.fullscreen;
+  now[34] = G.menu.filter_on, now[35] = G.menu.filter_smooth, now[36] = G.menu.filter_counter, now[37] = G.menu.rum[0], now[38] = G.menu.rum[1], now[39] = G.menu.rum[2], now[40] = G.menu.rum[3], now[41] = G.menu.fullscreen, now[42] = G.menu.btn_steer;
   if (G.options_global && !memcmp(now, last, sizeof now)) return;
   char path[1100];
   snprintf(path, sizeof path, "%s/option", G.save_dir);
@@ -1069,6 +1072,7 @@ static void options_save(void) {
   fprintf(f, "filter3 %d %d %d\n", now[34], now[35], now[36]);
   fprintf(f, "rumble4 %d %d %d %d\n", now[37], now[38], now[39], now[40]);
   fprintf(f, "window %d\n", now[41]);
+  fprintf(f, "btnsteer %d\n", now[42]);
   fclose(f);
   memcpy(last, now, sizeof last);
   G.options_global = 1;
@@ -4720,6 +4724,7 @@ void app_frame(float dt) {
   if (getenv("MT3DX_READOUT")) G.hud.readout = 1; /* (tests: the input readout on) */
   G.hud.filt_on = G.menu.filter_on, G.hud.filt_smooth = G.menu.filter_smooth, G.hud.filt_counter = G.menu.filter_counter;
   car_set_filter(G.menu.filter_on, G.menu.filter_smooth, G.menu.filter_counter);
+  car_set_button_steer(G.menu.btn_steer);
   /* The keys and pad axes as they really are, every race frame. The pause lets go of them (hud_init) and presses made while the race
    * was not taking input (the pause, a beaten 10-in-a-row rival's still) are dropped, and no event comes for a pedal that is still
    * down: the gas had to be lifted and pressed again. */
