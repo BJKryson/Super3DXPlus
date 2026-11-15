@@ -42,3 +42,7 @@ What Super3DX+ adds or changes compared with [Re3DX+](NOTICE.md). Longer explana
 - Windows, Linux and updated Android players
 - Windowed / fullscreen mode (F11 or Alt+Enter), remembered between starts
 - `build.py` and `tools/pipeline.py` build driver: Python 3.9+ and a C compiler, no WSL
+- Guided setup (`setup.bat` / `setup.sh`): installs what it needs, finds and checks your game folder, builds, and explains failures in plain language
+- Updates only redo what changed: a new version usually rebuilds just the game program in minutes, keeping your data and saves
+- `setup-pi`: builds and installs the game on a Raspberry Pi over the network, with the boot service and composite/HDMI output
+- `setup-android`: builds one self-contained Android app (any OS) and can install it over USB

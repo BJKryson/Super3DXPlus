@@ -36,7 +36,15 @@ Download the code, open a terminal in its folder and run `./setup.sh`. It instal
 
 Run **`setup-pi.bat`** / `./setup-pi.sh` to build and install the game on a Raspberry Pi over your network, or **`setup-android.bat`** / `./setup-android.sh` to build one self-contained Android app (and install it on a phone connected by USB). They download what they need and ask before anything big.
 
-**Updating:** when there is a new version, download it (or `git pull`) and run the setup again. It only redoes what changed: usually just the game program, in a few minutes, keeping your data and saves.
+**Updating to a new version** (no full rebuild needed)
+
+1. Get the new code: in a git checkout, `git pull` (the setup also offers to do it for you); otherwise download the new ZIP and unzip it **over** the old folder, replacing files when asked. Your finished game folders (`Super3DXPlus-Export`, `Super3DXPlus-JP`), your saves and the tools the setup downloaded (`.super3dx`) are not in the ZIP, so they stay.
+2. Run **`setup.bat`** (or `./setup.sh`) again and give it the same game folder. It recognises your earlier build and tells you what it will do:
+   - **Most updates (game code, menus, fixes):** it only rebuilds the game program, in a few minutes. Your converted data and saves are not touched.
+   - **When the data converters changed** (the changelog says so): it converts the data again (about an hour) and copies your saves into the new build.
+3. For the Raspberry Pi or Android, run `setup-pi` / `setup-android` again afterwards. The Pi script only re-sends data that changed; the Android script rebuilds the app in a few minutes, and installing it over the old one keeps your saves (as long as you keep the signing key in `.super3dx/android/debug.keystore`).
+
+Add `--full` to the setup (`python build.py wizard --full`) to force a complete rebuild if you ever want one.
 
 **If something goes wrong:** the setup stops with a plain-language explanation of what probably happened and what to do, and saves a full log in `build/logs/` (named `setup-<date>.txt`). If you are stuck, open an issue and attach that file. `docs/BUILDING.md` has a list of common problems and their fixes.
 
@@ -91,7 +99,7 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 - **Not implemented:** ghost VS battle, the post-race mileage screen, the 10 Outrun post-race rewards / progress screen.
 - **Known bugs:** menu slide/select animations aren't smooth; story rival headlight flare positions are inaccurate (no position data seems to be stored for them); gamepad detection for vibration is a little finicky (basic SDL2 compatibility).
 - **Limitations:** no racing wheel or force feedback support, and classic iOS support was dropped (no equipment to test either).
-- **Cautions:** story mode hasn't been played all the way through. The Japan build is tested much less than Export, since I can't read Japanese; if the text is messed up, please submit an issue.
+- **Cautions:** story mode hasn't been played all the way through. The Japan build is tested much less than Export, since I can't read Japanese; if the text is messed up, please submit an issue. The Pi and Android setup scripts (`setup-pi`, `setup-android`) are new: the Android script has built a valid app on Windows and Linux, but that app has not yet been run on a phone, and the Pi script has not yet been run start to finish on real hardware. If either fails, please open an issue with its log.
 - **Maybe later:** rollback netcode for online versus (big undertaking, noticeable performance cost), wheel support.
 
 

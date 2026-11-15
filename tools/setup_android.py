@@ -22,9 +22,16 @@ TOOLS = os.path.join(ROOT, ".super3dx")
 SDK_PACKAGES = ["platform-tools", "platforms;android-34", "build-tools;35.0.0", "ndk;26.1.10909125"]
 REPO_XML = "https://dl.google.com/android/repository/repository2-3.xml"
 REPO_BASE = "https://dl.google.com/android/repository/"
+# the command-line tools version whose sdkmanager is a plain Java program (the newest ones turn it into a deprecated wrapper around a new tool)
+CMDLINE_TOOLS = "cmdline-tools;11.0"
 LICENSES = "https://developer.android.com/studio/terms"
 WIN = os.name == "nt"
 EXE = ".exe" if WIN else ""
+
+
+def _open(url, timeout=60):
+    """urlopen with a client name (some download servers refuse Python's default one with a 403)"""
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Super3DXPlus-setup"}), timeout=timeout)
 
 
 def _vkey(name):
@@ -36,7 +43,7 @@ def _download(url, dest, digest=None, algo="sha256", what="a file"):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     h = hashlib.new(algo)
     try:
-        with urllib.request.urlopen(url, timeout=60) as r, open(dest + ".part", "wb") as f:
+        with _open(url) as r, open(dest + ".part", "wb") as f:
             total = int(r.headers.get("Content-Length") or 0)
             n, shown = 0, -1
             while True:
@@ -114,7 +121,7 @@ def ensure_jdk():
         raise SystemExit("no JDK download for this machine: install a JDK 17 yourself (https://adoptium.net)")
     url = "https://api.adoptium.net/v3/assets/latest/17/hotspot?architecture=%s&image_type=jdk&os=%s&vendor=eclipse" % (arch, os_)
     try:
-        pkg = json.load(urllib.request.urlopen(url, timeout=60))[0]["binary"]["package"]
+        pkg = json.load(_open(url))[0]["binary"]["package"]
     except (OSError, ValueError, KeyError, IndexError) as e:
         raise SystemExit("could not look up the JDK download (%s). Check your internet connection, or install a JDK 17 yourself." % e)
     arch_file = os.path.join(TOOLS, pkg["name"])
@@ -156,11 +163,11 @@ def _cmdline_tools(sdk, jdk):
     if _p.system() == "Darwin":
         host = "macosx"
     try:
-        root = ET.fromstring(urllib.request.urlopen(REPO_XML, timeout=60).read())
+        root = ET.fromstring(_open(REPO_XML).read())
     except (OSError, ET.ParseError) as e:
         raise SystemExit("could not read Google's Android download list (%s). Check your internet connection and run this again." % e)
     for pkg in root.iter():
-        if pkg.tag.endswith("remotePackage") and pkg.get("path") == "cmdline-tools;latest":
+        if pkg.tag.endswith("remotePackage") and pkg.get("path") == CMDLINE_TOOLS:
             for ar in pkg.iter():
                 if ar.tag.endswith("archive") and next((c.text for c in ar if c.tag.endswith("host-os")), None) == host:
                     comp = next(c for c in ar if c.tag.endswith("complete"))
@@ -182,6 +189,15 @@ def _cmdline_tools(sdk, jdk):
     raise SystemExit("Google's download list has no command-line tools for this system; install the Android SDK yourself (Android Studio) and set ANDROID_HOME")
 
 
+def _sdkmanager_cmd(sm, jdk, sdk, *args):
+    """the command line for the SDK manager, started through java directly (what its script does): the sdkmanager.bat of Windows splits
+    package names like "ndk;26.1.10909125" at the semicolon"""
+    home = os.path.dirname(os.path.dirname(sm))
+    java = os.path.join(jdk, "bin", "java" + EXE)
+    return [java, "-Dcom.android.sdklib.toolsdir=" + home, "-classpath", os.path.join(home, "lib", "sdkmanager-classpath.jar"),
+            "com.android.sdklib.tool.sdkmanager.SdkManagerCli", "--sdk_root=" + sdk] + list(args)
+
+
 def ensure_sdk(jdk):
     sdk = find_sdk()
     if sdk:
@@ -196,9 +212,9 @@ def ensure_sdk(jdk):
         raise SystemExit("the Android SDK is required")
     env = dict(os.environ, JAVA_HOME=jdk, PATH=os.path.join(jdk, "bin") + os.pathsep + os.environ.get("PATH", ""))
     sm = _cmdline_tools(sdk, jdk)
-    subprocess.run([sm, "--sdk_root=" + sdk, "--licenses"], input="y\n" * 60, text=True, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(_sdkmanager_cmd(sm, jdk, sdk, "--licenses"), input="y\n" * 60, text=True, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     say("\nInstalling the SDK packages (several minutes)...")
-    r = subprocess.run([sm, "--sdk_root=" + sdk] + SDK_PACKAGES, env=env)
+    r = subprocess.run(_sdkmanager_cmd(sm, jdk, sdk, *SDK_PACKAGES), env=env)
     if r.returncode or not _sdk_ok(sdk):
         raise SystemExit("the Android SDK could not be installed (see the messages above). Check your internet connection and free disk space, then run this again.")
     say("Android SDK: " + sdk)
