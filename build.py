@@ -32,6 +32,8 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.join(ROOT, ".super3dx")  # downloaded toolchain pieces (git-ignored)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+from setupkit import ask, yes, step, run_logged, explain_failure, ISSUES  # noqa: E402  (the guided setups' shared helpers)
 SDL_VER = "2.30.9"
 ZIG_VER = "0.17.1"
 ZIG = {  # (url, sha256) from ziglang.org/download/index.json
@@ -378,27 +380,6 @@ def pipeline(*args):
 # It installs what it can by itself, asks where your copy of the game is, checks it, builds, and says where the result is.
 KNOWN = {"22b9bbcc5a0cefd42a4e83b2dd892c98": "Japan", "aac96862372ee774a14096792fc40c13": "Export"}
 REQ_MODULES = ["capstone", "unicorn", "PIL", "numpy"]
-ISSUES = "https://github.com/smolderyguest/Super3DXPlus/issues"
-
-
-def ask(question, default=""):
-    try:
-        a = input(question).strip().strip('"').strip("'")
-    except EOFError:
-        return default
-    return a or default
-
-
-def yes(question, default=True):
-    a = ask(question + (" [Y/n] " if default else " [y/N] "), "y" if default else "n").lower()
-    return a.startswith("y")
-
-
-def step(n, total, title):
-    say("")
-    say("=" * 78)
-    say("Step %d of %d: %s" % (n, total, title))
-    say("=" * 78)
 
 
 def ensure_modules():
@@ -463,88 +444,6 @@ def browse_folder():
         return ""
 
 
-def run_logged(cmd, logpath):
-    """run a command, showing its output as it comes and keeping a copy in logpath; returns its exit code"""
-    os.makedirs(os.path.dirname(logpath), exist_ok=True)
-    env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONUTF8="1")
-    with open(logpath, "w", encoding="utf-8", errors="replace") as lf:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=ROOT,
-                             text=True, encoding="utf-8", errors="replace", bufsize=1)
-        try:
-            for line in p.stdout:
-                say(line.rstrip("\r\n"))
-                lf.write(line)
-                lf.flush()
-            return p.wait()
-        except BaseException:
-            p.terminate()
-            raise
-
-
-# what a failure's log says, and what to do about it (first match wins; the plain advice comes before the technical lines)
-DIAGNOSES = [
-    (r"no ffmpeg", "ffmpeg is not installed (it converts the game's sound and movies).\n"
-                   "  Windows: open a terminal and run   winget install Gyan.FFmpeg   (or get the 'full' build from https://www.gyan.dev/ffmpeg/builds/)\n"
-                   "  Linux: sudo apt install ffmpeg\n  Then run setup again."),
-    (r"no compiler for Windows|no SDL2 development files|no C compiler", "A build tool is missing or was not downloaded properly.\n"
-                   "  Run   python build.py doctor   to see what is missing, then run setup again."),
-    (r"WinError 206|filename or extension is too long|File name too long|Filename too long|WinError 3\]|No such file or directory: '[A-Za-z]:\\\\.{200,}",
-     "A file path got too long for Windows. Move the whole project folder somewhere short, such as C:\\Super3DXPlus, and run setup again."),
-    (r"No space left|WinError 112|Errno 28|not enough space|disk is full",
-     "The drive ran out of space. The build needs about 15 GB free. Free some space (or move the project folder to a bigger drive) and run setup again."),
-    (r"MemoryError|Cannot allocate memory|out of memory",
-     "The computer ran out of memory. Close other programs (browsers especially) and run setup again."),
-    (r"PermissionError|Access is denied|WinError 5\]|WinError 32|being used by another process|Permission denied",
-     "Windows (or an antivirus program) would not let the build write or delete a file.\n"
-     "  Close anything that may be using this folder (File Explorer windows inside it, a running copy of the game), pause your antivirus for the\n"
-     "  build or add this folder to its exclusions, make sure the folder is somewhere you can write to (not Program Files), and run setup again."),
-    (r"URLError|getaddrinfo|Temporary failure in name resolution|timed out|could not download",
-     "A download failed. Check your internet connection (a firewall, VPN or proxy can block it) and run setup again."),
-    (r"UnicodeEncodeError|UnicodeDecodeError",
-     "A text-encoding problem. This is a bug in the setup, not something you did wrong: please report it (details below)."),
-    (r"has no main and data|has no main|has no data",
-     "The game folder you chose is not what the setup expects: it must contain a file called `main` and a folder called `data`."),
-    (r"phys_rc\.c",
-     "The physics source was not generated. Run setup again from the start (it makes it in the first minutes)."),
-    (r"GENERATION STOPPED",
-     "The tools could not read your game's `main` file. The usual causes are a version of the game this project does not support\n"
-     "  (docs/BUILDS.md lists the ones that work) or an incomplete or damaged copy of the game. Check that you copied all of it, and that `main` is the\n"
-     "  game's real executable (tens of MB), not a shortcut or an empty file."),
-    (r"CONVERSION STOPPED",
-     "One of the data conversion steps failed. The line above this one says which; the lines before it show the converter's own message.\n"
-     "  Run   python tools/pipeline.py convert <your game folder> --only <that step>   after fixing the cause to retry just that step."),
-    (r"No module named",
-     "A Python package is missing. Run   python -m pip install -r tools/requirements.txt   and then setup again."),
-]
-
-
-def explain_failure(log, rc):
-    """print what went wrong in plain words, from the log of a failed build"""
-    text = open(log, encoding="utf-8", errors="replace").read()
-    lines = [l for l in text.splitlines() if l.strip()]
-    hint = next((h for pat, h in DIAGNOSES if re.search(pat, text)), None)
-    step = None
-    for l in reversed(lines):
-        m = re.match(r"^(\S+)\s+FAILED", l) or re.search(r"CONVERSION STOPPED at step '([^']+)'", l)
-        if m:
-            step = m.group(1)
-            break
-    say("\n" + "!" * 78)
-    say("The build stopped before it finished.%s" % ((" It failed at: " + step) if step else ""))
-    say("")
-    if hint:
-        say("What probably happened, and what to do:\n  " + hint)
-    else:
-        say("I do not recognise this error. The last lines of the log were:\n")
-        for l in lines[-12:]:
-            say("    " + l[:160])
-    say("")
-    say("Nothing was damaged. Once the cause is fixed, run setup again (it redoes the data step from the beginning).")
-    say("The full log is in:  " + log)
-    say("If you are still stuck, open an issue at %s and attach that log file (or paste its last 50 lines)." % ISSUES)
-    say("!" * 78)
-
-
 def preflight():
     """problems that would only show up an hour into the build; returns a message, or None if all is well"""
     if sys.version_info < (3, 9):
@@ -567,8 +466,70 @@ def preflight():
                 "  Moving the project folder to a simple path, such as C:\\Super3DXPlus, avoids that.")
     return None
 
+SKIP_HASH = ("tools/dev/", "tools/test/", "tools/pi/", "tools/setupkit.py", "tools/setup_", "tools/headline/dev/", "tools/headline/README.md", "tools/demangle.cpp")
 
-def wizard(folder, opt, jobs):
+
+def _generated_in_tools(rel):
+    """files the generators write into tools/ (they are git-ignored): not part of what makes the data"""
+    d, f = os.path.split(rel)
+    if d == "tools":
+        return (f.endswith(".json") and f != "jpids.json") or f.endswith("_texts.txt") or f == "uvtab.txt"
+    return rel == "tools/stage/barricades.txt" or rel.startswith("tools/vsdisc/")
+
+
+def tools_hash():
+    """a fingerprint of everything that decides what the converted data and the generated sources look like: the converters and generators
+    (not the setup helpers, tests and Pi scripts). If it is unchanged since a build, that build's data is still valid."""
+    h = hashlib.sha256()
+    base = os.path.join(ROOT, "tools")
+    for dp, dn, fn in os.walk(base):
+        dn[:] = sorted(d for d in dn if d != "__pycache__")
+        for f in sorted(fn):
+            full = os.path.join(dp, f)
+            rel = os.path.relpath(full, ROOT).replace(os.sep, "/")
+            if f.endswith(".pyc") or rel.startswith(SKIP_HASH) or _generated_in_tools(rel):
+                continue
+            h.update(rel.encode())
+            h.update(open(full, "rb").read().replace(b"\r\n", b"\n"))
+    return h.hexdigest()
+
+
+def read_info(folder):
+    try:
+        import json
+        return json.load(open(os.path.join(folder, "build-info.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def write_info(folder, md5, region):
+    import json, time
+    commit = None
+    if which("git") and os.path.isdir(os.path.join(ROOT, ".git")):
+        r = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+        commit = r.stdout.strip() or None
+    json.dump({"tools": tools_hash(), "main_md5": md5, "region": region, "built": time.strftime("%Y-%m-%d %H:%M"), "source_commit": commit},
+              open(os.path.join(folder, "build-info.json"), "w", encoding="utf-8"), indent=1)
+
+
+def offer_git_pull():
+    """for a git checkout: offer to fetch the latest sources first"""
+    if not (which("git") and os.path.isdir(os.path.join(ROOT, ".git"))):
+        return
+    if not yes("\nThis folder is a git checkout. Download the latest version from GitHub first?"):
+        return
+    r = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT)
+    if r.returncode:
+        say("\nCould not update automatically (you probably have changes of your own in this folder). Carrying on with what is here.")
+
+
+def refresh(game, target, opt, jobs):
+    """the quick update: the generated sources and the player, no data conversion"""
+    pipeline("gen", game, "--phys")
+    build_exe(target, None, opt, jobs)
+
+
+def wizard(folder, opt, jobs, full=False):
     target = "windows" if os.name == "nt" else "linux"
     total = 4
     for stream in (sys.stdout, sys.stderr):  # a Windows console that cannot show a character must not stop the build
@@ -588,6 +549,7 @@ def wizard(folder, opt, jobs):
     say("Super3DX+ setup")
     say("This builds the game from YOUR OWN copy of Wangan Midnight Maximum Tune 3DX+. It needs an internet connection for a few small")
     say("downloads, about 15 GB of free disk space, and takes an hour or more. You can leave it alone while it works.")
+    offer_git_pull()
     free = shutil.disk_usage(ROOT).free / 2**30
     if free < 15:
         say("\nWARNING: only %.0f GB free on this drive; the build needs about 15 GB." % free)
@@ -658,18 +620,36 @@ def wizard(folder, opt, jobs):
         region = "Custom"
 
     # 3 ------------------------------------------------------------------------------------------------------------
-    if not yes("\nReady. Start the build now? (about an hour; nothing to click once it starts)"):
-        return 1
-    step(3, total, "convert the data and build the game (about an hour; nothing to click)")
     import time
+    dest = os.path.join(ROOT, "Super3DXPlus-" + region)
+    info = read_info(dest)
+    exe_name = "super3dx.exe" if target == "windows" else "super3dx"
+    can_update = (not full and info and info.get("main_md5") == md5 and info.get("tools") == tools_hash()
+                  and os.path.isfile(os.path.join(dest, exe_name)) and os.path.isdir(os.path.join(dest, "data")))
+    if can_update:
+        say("\nFound your earlier build: " + dest)
+        say("Built %s%s. The converted data is still valid (nothing that makes it has changed), so only the player needs rebuilding:" %
+            (info.get("built", "earlier"), (" from commit " + info["source_commit"]) if info.get("source_commit") else ""))
+        say("a few minutes, and your saves and data are not touched.")
+        if not yes("Update it now?"):
+            return 1
+    else:
+        if os.path.isdir(dest):
+            say("\nFound an earlier build in " + dest)
+            say("It cannot be updated in place (%s), so the data must be converted again (about an hour)." %
+                ("you asked for a full rebuild" if full else "the data tools changed since, or it was built by an older setup"))
+            say("Your saves in its `save` folder are kept: they are copied into the new build.")
+        if not yes("\nReady. Start the build now? (about an hour; nothing to click once it starts)"):
+            return 1
+    step(3, total, "build the player" if can_update else "convert the data and build the game (about an hour; nothing to click)")
     t0 = time.time()
     log = os.path.join(ROOT, "build", "logs", "setup-%s.txt" % time.strftime("%Y%m%d-%H%M%S"))
     say("(everything below is also saved in %s)\n" % os.path.relpath(log, ROOT))
-    cmd = [sys.executable, os.path.abspath(__file__), "all", game, "--target", target, "-O" + opt, "-j", str(jobs)]
+    cmd = [sys.executable, os.path.abspath(__file__), "refresh" if can_update else "all", game, "--target", target, "-O" + opt, "-j", str(jobs)]
     try:
         rc = run_logged(cmd, log)
     except KeyboardInterrupt:
-        say("\nStopped. Nothing is broken: run setup again whenever you like (it starts over from the beginning).")
+        say("\nStopped. Nothing is broken: run setup again whenever you like.")
         return 1
     if rc:
         explain_failure(log, rc)
@@ -677,18 +657,36 @@ def wizard(folder, opt, jobs):
 
     # 4 ------------------------------------------------------------------------------------------------------------
     step(4, total, "done")
-    pk = os.path.join(ROOT, "build", target, "package")
-    dest, n = os.path.join(ROOT, "Super3DXPlus-" + region), 1
-    while os.path.exists(dest):  # never overwrite an earlier build: it may hold saves
-        n += 1
-        dest = os.path.join(ROOT, "Super3DXPlus-%s-%d" % (region, n))
-    os.replace(pk, dest)
+    built = os.path.join(ROOT, "build", target)
+    if can_update:
+        try:
+            for f in ([exe_name, "SDL2.dll"] if target == "windows" else [exe_name]):
+                shutil.copy2(os.path.join(built, f), os.path.join(dest, f))
+        except PermissionError:
+            say("\nThe game could not be updated because a file is in use: close the game (and any window showing that folder) and run setup again.")
+            return 1
+        write_info(dest, md5, region)
+        say("Updated in %d minutes." % ((time.time() - t0) // 60))
+    else:
+        pk = os.path.join(built, "package")
+        old = None
+        if os.path.isdir(dest):  # replace the earlier build, keeping its saves
+            old = dest + ".old"
+            shutil.rmtree(old, ignore_errors=True)
+            if os.path.isdir(os.path.join(dest, "save")):
+                shutil.copytree(os.path.join(dest, "save"), os.path.join(pk, "save"), dirs_exist_ok=True)
+            os.replace(dest, old)
+        os.replace(pk, dest)
+        write_info(dest, md5, region)
+        if old:
+            shutil.rmtree(old, ignore_errors=True)
+        say("Built in %d minutes." % ((time.time() - t0) // 60))
     exe = os.path.join(dest, "super3dx.exe" if target == "windows" else "play.sh")
-    say("Built in %d minutes." % ((time.time() - t0) // 60))
     say("\nYour game is in this folder:\n\n    " + dest + "\n")
     say("To play: open that folder and %s. Your saves are kept in its `save` folder." % ("double-click super3dx.exe" if target == "windows" else "run play.sh"))
     say("To move the game to another PC, copy or zip that whole folder. Do not share it: it contains the game's data.")
     say("To build the other version (Japan / Export), run this again and choose that game folder.")
+    say("After a new version of Super3DX+ comes out, run this again: it only redoes what changed.")
     if yes("\nStart the game now?"):
         if target == "windows":
             os.startfile(exe)
@@ -700,17 +698,18 @@ def wizard(folder, opt, jobs):
 def main():
     os.environ["PYTHONUTF8"] = "1"  # every Python tool this starts reads and writes UTF-8 (the Windows default, cp1252, cannot hold the Japanese text)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
+    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "refresh", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
     ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data, all and wizard)")
     ap.add_argument("--target", choices=["windows", "linux", "pi"], default="windows" if os.name == "nt" else "linux")
     ap.add_argument("--cc", help="the C compiler command to use (e.g. 'zig cc -target x86_64-windows-gnu')")
     ap.add_argument("-O", dest="opt", default="-O2", help="the optimisation flag (-O1 compiles quicker)")
     ap.add_argument("-j", dest="jobs", type=int, default=os.cpu_count() or 2, help="compiler processes at once")
     ap.add_argument("--no-media", action="store_true", help="data: skip the sounds, music and movies")
+    ap.add_argument("--full", action="store_true", help="wizard: rebuild everything even if the earlier build is up to date")
     a = ap.parse_args()
     if a.cmd == "wizard":
         try:
-            sys.exit(wizard(a.arcade, a.opt, a.jobs))
+            sys.exit(wizard(a.arcade, a.opt, a.jobs, a.full))
         except KeyboardInterrupt:
             sys.exit("\nStopped. Run setup again whenever you like.")
         except SystemExit as e:  # a plain-language message from a helper (a failed download, a missing tool...)
@@ -726,6 +725,11 @@ def main():
             say("\n" + "!" * 78 + "\nThe setup hit an unexpected problem (it is a bug in the setup, not your fault).\n"
                 "Please open an issue at %s and attach this file:\n\n    %s\n" % (ISSUES, err) + "!" * 78)
             sys.exit(1)
+    if a.cmd == "refresh":
+        if not a.arcade:
+            die("refresh needs the arcade dump folder")
+        refresh(a.arcade, a.target, a.opt, a.jobs)
+        return
     if a.cmd == "doctor":
         doctor()
     elif a.cmd == "setup-zig":
