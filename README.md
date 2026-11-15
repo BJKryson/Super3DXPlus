@@ -6,6 +6,8 @@ This an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+*
 - Android
 - Raspberry Pi
 
+Showcase video: https://www.youtube.com/watch?v=WwAjkctDoF4
+
 ## Copyright disclaimer
 
 This repository does **NOT** contain any copyrighted content from the original game or from Bandai Namco Entertainment, Inc. or its affiliates, and nothing generated from it. It contains only free, open-source (MIT) tools for building the conversion from **your own legally obtained game data**. See [Quick start](#quick-start).
