@@ -54,15 +54,38 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 
 ## Quick start
 
-You need a dump of the game data (a folder with `main` and `data/`; `docs/BUILDS.md` lists known-good builds), Python 3.9+, and a C compiler (on Windows: Zig or MinGW-w64; no WSL needed).
+**What you need first:** your own copy of the game, as a folder containing `main` (the arcade executable) and a `data/` folder, for the Japan or Export version of 3DX+ (`docs/BUILDS.md` lists the versions known to work, and how to tell which you have). You also need a few GB of free disk space and an hour or more of mostly unattended build time. Nothing from the game is downloaded or included for you.
 
-```sh
-pip install -r tools/requirements.txt
-python build.py doctor                      # what you have and what is missing
-python build.py all /path/to/the/dump       # tables, physics, data (an hour or more), the player, a folder to zip
-```
+**Windows**
 
-Options and the other targets (Linux, Pi, Android) are in `docs/BUILDING.md`. Run `super3dx.exe` from the output folder, or `build/windows/package/play.bat` (`play.sh`); data and saves live next to it.
+1. Install [Python 3.9 or newer](https://www.python.org/downloads/) (tick "Add python.exe to PATH") and [Git](https://git-scm.com/).
+2. Get the code and the Python packages. In a terminal:
+   ```sh
+   git clone https://github.com/smolderyguest/Super3DXPlus.git
+   cd Super3DXPlus
+   pip install -r tools/requirements.txt
+   ```
+3. Get the build tools. The first two download into the project folder and need no installer; ffmpeg installs system-wide:
+   ```sh
+   python build.py setup-zig       # the C compiler
+   python build.py setup-sdl2      # the SDL2 library
+   winget install Gyan.FFmpeg      # converts the game's sound and movies (a full build, not a minimal one)
+   ```
+4. Check that nothing is missing: `python build.py doctor`. It lists anything absent and how to get it.
+5. Build everything from your game folder (use the path to your own copy):
+   ```sh
+   python build.py all "C:\path\to\your\game\folder"
+   ```
+   This converts the game's data (an hour or more) and then compiles the player. If a step fails, the log for it is in `build/logs/`.
+6. Run it: open `build\windows\package\` and double-click `super3dx.exe`. Saves are kept in a `save` folder next to it. That folder is the whole game, so you can zip it and move it to another PC.
+
+**Linux**
+
+Same steps, with your package manager instead of step 3: `sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev ffmpeg`, then `python3 build.py doctor` and `python3 build.py all /path/to/your/game/folder`. Run `build/linux/package/play.sh`.
+
+**Other targets**
+
+For the Raspberry Pi and Android, build the data on a PC first as above, then follow `docs/PI.md` or `docs/BUILDING.md`. Options, troubleshooting and the individual steps (`data`, `exe`, `package`) are in `docs/BUILDING.md`. Controls and remapping are in `docs/INPUT.md`.
 
 ## Layout
 
