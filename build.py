@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Builds the player. One script for Windows, Linux (also the Raspberry Pi) and macOS: Python 3.9+ and a C compiler, no WSL.
 
+    python build.py                              the guided setup: installs what it can, asks where your game is, builds, says where it is
     python build.py doctor                       what is installed, what is missing and how to get it
     python build.py data <arcade root>           gen + convert: the tables, the recompiled physics and the game's data (data/)
     python build.py exe [--target T] [--cc CC]   the player: build/<target>/super3dx[.exe]
@@ -363,16 +364,225 @@ def pipeline(*args):
     run([sys.executable, os.path.join(ROOT, "tools", "pipeline.py")] + list(args), cwd=ROOT)
 
 
+# -------------------------------------------------------------------------------------------------------- wizard
+# The guided path for people who just want the game: `python build.py` (or double-click setup.bat / run ./setup.sh).
+# It installs what it can by itself, asks where your copy of the game is, checks it, builds, and says where the result is.
+KNOWN = {"22b9bbcc5a0cefd42a4e83b2dd892c98": "Japan", "aac96862372ee774a14096792fc40c13": "Export"}
+REQ_MODULES = ["capstone", "unicorn", "PIL", "numpy"]
+ISSUES = "https://github.com/smolderyguest/Super3DXPlus/issues"
+
+
+def ask(question, default=""):
+    try:
+        a = input(question).strip().strip('"').strip("'")
+    except EOFError:
+        return default
+    return a or default
+
+
+def yes(question, default=True):
+    a = ask(question + (" [Y/n] " if default else " [y/N] "), "y" if default else "n").lower()
+    return a.startswith("y")
+
+
+def step(n, total, title):
+    say("")
+    say("=" * 78)
+    say("Step %d of %d: %s" % (n, total, title))
+    say("=" * 78)
+
+
+def ensure_modules():
+    """the Python packages the converters use; installs them, in a private virtual environment if the system Python refuses"""
+    missing = [m for m in REQ_MODULES if not _has(m)] + (["cxxfilt"] if os.name == "nt" and not _has("cxxfilt") else [])
+    if not missing:
+        say("Python packages: all there.")
+        return
+    req = os.path.join(ROOT, "tools", "requirements.txt")
+    say("Installing the Python packages the converters need (%s)..." % ", ".join(missing))
+    if subprocess.run([sys.executable, "-m", "pip", "install", "-r", req]).returncode == 0:
+        import importlib
+        importlib.invalidate_caches()
+        return
+    if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+        die("could not install the Python packages (pip failed, see above)")
+    say("The system Python would not take them; making a private environment in .super3dx/venv ...")
+    venv = os.path.join(TOOLS, "venv")
+    if subprocess.run([sys.executable, "-m", "venv", venv]).returncode:
+        die("could not make a virtual environment. On Debian/Ubuntu run: sudo apt install python3-venv python3-pip")
+    py = os.path.join(venv, "Scripts" if os.name == "nt" else "bin", "python" + (".exe" if os.name == "nt" else ""))
+    if subprocess.run([py, "-m", "pip", "install", "-r", req]).returncode:
+        die("could not install the Python packages (pip failed, see above)")
+    sys.exit(subprocess.run([py] + sys.argv).returncode)  # carry on inside it
+
+
+def find_ffmpeg():
+    p = os.environ.get("FFMPEG") or which("ffmpeg")
+    if p:
+        return p
+    if os.name == "nt":  # a winget install in this very session is not on this process's PATH yet
+        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet")
+        for pat in (os.path.join(base, "Links", "ffmpeg.exe"), os.path.join(base, "Packages", "Gyan.FFmpeg*", "**", "bin", "ffmpeg.exe")):
+            m = glob.glob(pat, recursive=True)
+            if m:
+                return m[0]
+    return None
+
+
+def find_game(path):
+    """the folder holding `main` and `data/`: the path itself, or one level inside it"""
+    path = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isdir(path):
+        return None
+    for cand in [path] + sorted(os.path.join(path, d) for d in os.listdir(path)):
+        if os.path.isfile(os.path.join(cand, "main")) and os.path.isdir(os.path.join(cand, "data")):
+            return cand
+    return None
+
+
+def browse_folder():
+    try:
+        import tkinter
+        from tkinter import filedialog
+        root = tkinter.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        p = filedialog.askdirectory(title="Choose the folder with your copy of the game (it has main and data inside)")
+        root.destroy()
+        return p
+    except Exception:
+        return ""
+
+
+def wizard(folder, opt, jobs):
+    target = "windows" if os.name == "nt" else "linux"
+    total = 4
+    say("")
+    say("Super3DX+ setup")
+    say("This builds the game from YOUR OWN copy of Wangan Midnight Maximum Tune 3DX+. It needs an internet connection for a few small")
+    say("downloads, about 15 GB of free disk space, and takes an hour or more. You can leave it alone while it works.")
+    free = shutil.disk_usage(ROOT).free / 2**30
+    if free < 15:
+        say("\nWARNING: only %.0f GB free on this drive; the build needs about 15 GB." % free)
+        if not yes("Carry on anyway?", False):
+            return 1
+
+    # 1 ------------------------------------------------------------------------------------------------------------
+    step(1, total, "get the tools (automatic)")
+    ensure_modules()
+    if target == "windows":
+        if not (find_zig() or which("x86_64-w64-mingw32-gcc-posix", "x86_64-w64-mingw32-gcc")):
+            setup_zig()
+        else:
+            say("C compiler: found.")
+        if not sdl2_mingw():
+            setup_sdl2()
+        else:
+            say("SDL2: found.")
+    else:
+        missing = []
+        if not which("gcc", "clang", "cc"):
+            missing.append("a C compiler")
+        if not (which("sdl2-config") or (which("pkg-config") and subprocess.run([which("pkg-config"), "--exists", "sdl2"]).returncode == 0)):
+            missing.append("the SDL2 development files")
+        if missing:
+            say("\nMissing: " + " and ".join(missing) + ". On Ubuntu/Debian/Raspberry Pi OS, install them with:\n")
+            say("    sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev ffmpeg\n")
+            say("then run this again.")
+            return 1
+    ff = find_ffmpeg()
+    if not ff and os.name == "nt" and which("winget"):
+        say("\nffmpeg (it converts the game's sound and movies) is not installed.")
+        if yes("Install it now with winget? (a normal Windows installer; it may ask for permission)"):
+            subprocess.run(["winget", "install", "--id", "Gyan.FFmpeg", "-e", "--accept-package-agreements", "--accept-source-agreements"])
+            ff = find_ffmpeg()
+    if not ff:
+        say("\nffmpeg is missing. Install it (Windows: winget install Gyan.FFmpeg, or https://www.gyan.dev/ffmpeg/builds/ - the 'full' build;")
+        say("Linux: sudo apt install ffmpeg), then run this again.")
+        return 1
+    os.environ["FFMPEG"] = ff
+    say("ffmpeg: " + ff)
+
+    # 2 ------------------------------------------------------------------------------------------------------------
+    step(2, total, "find your copy of the game")
+    say("I need the folder that holds your copy of the game: it has a file called `main` and a folder called `data` inside.")
+    game = find_game(folder) if folder else None
+    while not game:
+        if folder:
+            say("\nNo `main` file and `data` folder found in: %s" % folder)
+        say("\nPress Enter to browse for the folder, or paste / drag the folder into this window and press Enter (q to quit).")
+        a = ask("> ")
+        if a.lower() == "q":
+            return 1
+        folder = a or browse_folder()
+        if not folder:
+            continue
+        game = find_game(folder)
+    md5 = hashlib.md5(open(os.path.join(game, "main"), "rb").read()).hexdigest()
+    region = KNOWN.get(md5)
+    say("\nGame folder: " + game)
+    if region:
+        say("Recognised: the %s version of 3DX+." % region)
+    else:
+        say("This `main` is not one of the versions this project was tested with (docs/BUILDS.md lists them).")
+        say("It may still work, but expect problems.")
+        if not yes("Carry on anyway?", False):
+            return 1
+        region = "Custom"
+
+    # 3 ------------------------------------------------------------------------------------------------------------
+    if not yes("\nReady. Start the build now? (about an hour; nothing to click once it starts)"):
+        return 1
+    step(3, total, "convert the data and build the game (about an hour; nothing to click)")
+    import time
+    t0 = time.time()
+    try:
+        pipeline("gen", game, "--phys")
+        pipeline("convert", game)
+        build_exe(target, None, opt, jobs)
+        package(target)
+    except SystemExit as e:
+        say("\n" + "!" * 78)
+        say("Something went wrong: %s" % (e.code if isinstance(e.code, str) else "exit code %s" % e.code))
+        say("Details are in the folder build/logs/ (one file per step). Once the cause is fixed, run this again.")
+        say("If you are stuck, open an issue at %s and attach the newest file from build/logs/." % ISSUES)
+        say("!" * 78)
+        return 1
+
+    # 4 ------------------------------------------------------------------------------------------------------------
+    step(4, total, "done")
+    pk = os.path.join(ROOT, "build", target, "package")
+    dest, n = os.path.join(ROOT, "Super3DXPlus-" + region), 1
+    while os.path.exists(dest):  # never overwrite an earlier build: it may hold saves
+        n += 1
+        dest = os.path.join(ROOT, "Super3DXPlus-%s-%d" % (region, n))
+    os.replace(pk, dest)
+    exe = os.path.join(dest, "super3dx.exe" if target == "windows" else "play.sh")
+    say("Built in %d minutes." % ((time.time() - t0) // 60))
+    say("\nYour game is in this folder:\n\n    " + dest + "\n")
+    say("To play: open that folder and %s. Your saves are kept in its `save` folder." % ("double-click super3dx.exe" if target == "windows" else "run play.sh"))
+    say("To move the game to another PC, copy or zip that whole folder. Do not share it: it contains the game's data.")
+    say("To build the other version (Japan / Export), run this again and choose that game folder.")
+    if yes("\nStart the game now?"):
+        if target == "windows":
+            os.startfile(exe)
+        else:
+            subprocess.Popen([exe])
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
-    ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data and all)")
+    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
+    ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data, all and wizard)")
     ap.add_argument("--target", choices=["windows", "linux", "pi"], default="windows" if os.name == "nt" else "linux")
     ap.add_argument("--cc", help="the C compiler command to use (e.g. 'zig cc -target x86_64-windows-gnu')")
     ap.add_argument("-O", dest="opt", default="-O2", help="the optimisation flag (-O1 compiles quicker)")
     ap.add_argument("-j", dest="jobs", type=int, default=os.cpu_count() or 2, help="compiler processes at once")
     ap.add_argument("--no-media", action="store_true", help="data: skip the sounds, music and movies")
     a = ap.parse_args()
+    if a.cmd == "wizard":
+        sys.exit(wizard(a.arcade, a.opt, a.jobs))
     if a.cmd == "doctor":
         doctor()
     elif a.cmd == "setup-zig":

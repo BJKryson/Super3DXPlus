@@ -54,38 +54,22 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 
 ## Quick start
 
-**What you need first:** your own copy of the game, as a folder containing `main` (the arcade executable) and a `data/` folder, for the Japan or Export version of 3DX+ (`docs/BUILDS.md` lists the versions known to work, and how to tell which you have). You also need a few GB of free disk space and an hour or more of mostly unattended build time. Nothing from the game is downloaded or included for you.
+**You need your own copy of the game:** a folder with a file called `main` and a folder called `data` inside (from the Japan or Export version of 3DX+; `docs/BUILDS.md` lists the versions known to work). Nothing from the game is included or downloaded. You also need about 15 GB of free disk space, an internet connection for the first run, and an hour or more of waiting.
 
 **Windows**
 
-1. Install [Python 3.9 or newer](https://www.python.org/downloads/) (tick "Add python.exe to PATH") and [Git](https://git-scm.com/).
-2. Get the code and the Python packages. In a terminal:
-   ```sh
-   git clone https://github.com/smolderyguest/Super3DXPlus.git
-   cd Super3DXPlus
-   pip install -r tools/requirements.txt
-   ```
-3. Get the build tools. The first two download into the project folder and need no installer; ffmpeg installs system-wide:
-   ```sh
-   python build.py setup-zig       # the C compiler
-   python build.py setup-sdl2      # the SDL2 library
-   winget install Gyan.FFmpeg      # converts the game's sound and movies (a full build, not a minimal one)
-   ```
-4. Check that nothing is missing: `python build.py doctor`. It lists anything absent and how to get it.
-5. Build everything from your game folder (use the path to your own copy):
-   ```sh
-   python build.py all "C:\path\to\your\game\folder"
-   ```
-   This converts the game's data (an hour or more) and then compiles the player. If a step fails, the log for it is in `build/logs/`.
-6. Run it: open `build\windows\package\` and double-click `super3dx.exe`. Saves are kept in a `save` folder next to it. That folder is the whole game, so you can zip it and move it to another PC.
+1. On this page, click the green **Code** button, then **Download ZIP**, and unzip it somewhere (not inside a protected folder like Program Files).
+2. Double-click **`setup.bat`**.
+3. Follow the prompts. It installs what it needs (it will offer to install Python and ffmpeg if you don't have them), asks you to pick your game folder, and builds everything.
+4. When it says it's done, it tells you which folder your game is in. Open it and double-click **`super3dx.exe`**.
 
-**Linux**
+**Linux / Raspberry Pi / macOS**
 
-Same steps, with your package manager instead of step 3: `sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev ffmpeg`, then `python3 build.py doctor` and `python3 build.py all /path/to/your/game/folder`. Run `build/linux/package/play.sh`.
+Download the code, open a terminal in its folder and run `./setup.sh`. It installs the Python packages by itself, and tells you the one `apt install` command to run if a compiler or SDL2 is missing.
 
-**Other targets**
+**If something goes wrong:** the error says which step failed, and every step writes a log to `build/logs/`. Open an issue and attach the newest log file. `python build.py doctor` lists what is installed and what is missing.
 
-For the Raspberry Pi and Android, build the data on a PC first as above, then follow `docs/PI.md` or `docs/BUILDING.md`. Options, troubleshooting and the individual steps (`data`, `exe`, `package`) are in `docs/BUILDING.md`. Controls and remapping are in `docs/INPUT.md`.
+**Other things you can do:** build the Japan and Export versions side by side (run setup again with the other game folder), run the steps by hand, or build for the Raspberry Pi and Android: see `docs/BUILDING.md`, `docs/PI.md` and `docs/INPUT.md` for controls.
 
 ## Layout
 

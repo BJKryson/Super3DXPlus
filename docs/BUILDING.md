@@ -1,5 +1,7 @@
 # Building
 
+**The easy way:** double-click `setup.bat` (Windows) or run `./setup.sh` (Linux, macOS). It does everything below for you and asks only where your game is. The rest of this page is for doing the steps by hand.
+
 Everything is driven by `build.py` (the player) and `tools/pipeline.py` (the data); both are plain Python 3.9+, the same on Windows,
 Linux and macOS. `python build.py doctor` shows what is installed and what is missing, with the command to get it.
 
