@@ -109,6 +109,7 @@ def tool_env(main):
     env = dict(os.environ)
     env["WMMT_MAIN"] = main
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"  # Windows Python otherwise reads and writes files in the regional code page (cp1252) and the Japanese text fails
     return env
 
 

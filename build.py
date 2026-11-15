@@ -572,6 +572,7 @@ def wizard(folder, opt, jobs):
 
 
 def main():
+    os.environ["PYTHONUTF8"] = "1"  # every Python tool this starts reads and writes UTF-8 (the Windows default, cp1252, cannot hold the Japanese text)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
     ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data, all and wizard)")
