@@ -120,8 +120,8 @@ and do nothing in the arcade's.
 
 The nameplate's and the route map's backgrounds carry the arcade's scanline bars, a row of the texture to a row of the 640x480 screen.
 The arcade style at a 640x480 window (and 720x480) lays every sprite on whole pixels, so the bars come out as on the cabinet; scaled
-to any other size they smear (a 1024x768 window measures 64 % of the rows alternating, against 100 % at 640x480). `tools/test/pixel_bars_test.ps1`
-runs a time attack at those sizes, shoots it and measures the bars against the cabinet's own frame (`tools/test/stripes.py`; the scripts keep this workspace's paths).
+to any other size they smear (a 1024x768 window measures 64 % of the rows alternating, against 100 % at 640x480).
+A time attack run at those sizes, shot and measured against the cabinet's own frame shows it.
 
 ## Key bindings
 

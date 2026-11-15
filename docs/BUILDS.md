@@ -159,7 +159,7 @@ left off a new car's card (its card is made first), and the card check's control
   lacks are left at zero with 5 spokes (guarded in the story path as well). Not yet seen in a race (he is the tenth): to test with the user.
 - **Gold wheels of the rivals.** Like the Imprezas', the characar `tire*.igb` wheel textures `gtu_low_col1`, `te37_low_col1`, `rg2_low_col2`,
   `ce28_low_col1` and `eigh_low_col2` are stored red/blue exchanged; they are in `RB_SWAPPED` now and 11 (Export) / 13 (Japan) chara packs
-  were repacked (a local dev script (not kept here); `chara_wheels.py` lists a build's wheels with their mean colour). Not touched, because they can
+  were repacked. Not touched, because they can
   really be blue or orange: `eigh_low_col4` (Z31 Akio), `57f_low_col1` (the FD3S shop demo car).
 - **Aero kits painted.** An aero pack that carries its own body textures (FC3S aeroC with its `.tga` names, a Gemballa's kits) was never
   painted; the kits drew in the model's default colour. `wpk_paint` + `wpk_share_sync` now run on the aero scene in the menus, the race and
@@ -172,7 +172,7 @@ left off a new car's card (its card is made first), and the card check's control
   `WMMT_ANISO`, `WMMT_LODBIAS`. The SDL player and Android default to 16x and -1.0 (a mip level sharper: the road's lines stay crisp further
   out); the iPad build keeps 0. The bias goes through a `TEXB()` macro the map's fragment shaders sample with (render.c); cars' and UI
   shaders are untouched. Restart to apply.
-- **Test script.** `run_script.ps1` types the name with the katakana page on Japan (its name screen drops the first inputs, so the script
+- **Test script.** A `MT3DX_SCRIPT` with `{NAME}` types the name with the katakana page on Japan (its name screen drops the first inputs, so the script
   starts with two that cancel).
 
 ### The same model twice in one save
@@ -335,7 +335,7 @@ special colours the card has won - all ten for a car made with ALL PARTS, one pe
 START takes the one card (save 1; the saves screen stays in the code for several cards later) and opens the car select: the card's cars,
 five to a page and sorted by last used, each on a tile (car in its parts, its name, horsepower), the last tile a new car's. Each car has its own name
 (`cname` lines in garage1, asked after a new car's setting; a car from before them takes the old player name), and `cused` its last drive. The player name of
-the rankings and the card is the driven car's. Saves in slots 2 to 4 are not offered any more. Test scripts: `{NAME}` in run_script.ps1's -Script types a car's name.
+the rankings and the card is the driven car's. Saves in slots 2 to 4 are not offered any more. In an `MT3DX_SCRIPT`, `{NAME}` types a car's name.
 
 ## Main menu, settings, a new car's start
 
