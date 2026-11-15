@@ -1,6 +1,6 @@
 # Super3DX+
 
-This an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* built for non-wheel controllers, with a console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo), but the player was rebuilt on SDL2 alongside the Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
+This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* built primarily for controllers, with a console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo). The player was rebuilt on SDL2 alongside the original Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
 
 - PC (Windows / Linux)
 - Android
@@ -109,5 +109,5 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 MIT (`LICENSE`), keeping Re3DX+'s copyright. Game content is not covered and not included. See `NOTICE.md`.
 
 - **Super3DX+**: developed by [smolderyguest](https://github.com/smolderyguest).
-- **[Re3DX+](https://github.com/Allannn-sudo)** by Allannn-sudo: the original conversion effort, including the static recompilation of the physics and the first rewrite of rendering, menus, HUD, sound and data converters (MIT).
+- **Re3DX+** by [Allannn-sudo](https://github.com/Allannn-sudo): the original conversion effort, including the static recompilation of the physics and the first rewrite of rendering, menus, HUD, sound and data converters (MIT).
 - **libretro / Lakka-LibreELEC**: reference for the Pi's composite output and filtering method.
