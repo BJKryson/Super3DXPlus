@@ -59,7 +59,7 @@ TEXT = SEC[".text"]
 # Code outside the game logic (display, sound, network, files, debug text) is not translated:
 # calls to it return 0 at once, as under the Unicorn reference (emu/seq.py stub_nonlogic).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from sysdeps import demangle_many  # noqa: E402  (c++filt, or the cxxfilt package where there is none: Windows)
+from sysdeps import demangle_many  # noqa: E402  (c++filt, or the helper tools/demangle.cpp built with Zig: Windows)
 DEMANGLED = dict(zip(FUNC_ADDRS, demangle_many(SYMS[a] for a in FUNC_ADDRS)))
 # YOURTMOVIE_CPP (with FEQuat*): the story's realtime movies, their cars driven by yt::CGhost from the
 # recorded trails (yt::CSampler) and their key cameras; youTitle: the titles' rules (GetTitleList),

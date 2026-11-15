@@ -1,5 +1,5 @@
 """What the tools need from the system that is not a Python package, found the same way on Windows, Linux and macOS:
-a C++ demangler (c++filt, or the `cxxfilt` package) and fonts (any of a list of file names in the usual font folders, or in
+a C++ demangler (c++filt, or tools/demangle.cpp built with Zig, which is what Windows uses) and fonts (any of a list of file names in the usual font folders, or in
 the folders named by MT3DX_FONT_DIRS, `;` or `:` separated)."""
 import glob
 import os
@@ -7,24 +7,50 @@ import shutil
 import subprocess
 
 
+def _helper_compilers():
+    """C++ compilers that can build tools/demangle.cpp: the Zig that build.py setup-zig fetched, one on PATH, or a C++ compiler on PATH"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    exe = "zig.exe" if os.name == "nt" else "zig"
+    for z in (os.path.join(root, ".super3dx", "zig", exe), shutil.which("zig")):
+        if z and os.path.isfile(z):
+            tgt = ["-target", "x86_64-windows-gnu"] if os.name == "nt" else []
+            yield [z, "c++", "-O2"] + tgt
+    for cxx in ("g++", "clang++", "x86_64-w64-mingw32-g++"):
+        p = shutil.which(cxx)
+        if p:
+            yield [p, "-O2"]
+
+
+def _demangle_helper():
+    """tools/demangle.cpp built once into .super3dx/ (libc++abi's demangler, from Zig or any C++ compiler); None if it cannot be built"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src = os.path.join(root, "tools", "demangle.cpp")
+    out = os.path.join(root, ".super3dx", "demangle" + (".exe" if os.name == "nt" else ""))
+    if os.path.isfile(out) and os.path.getmtime(out) >= os.path.getmtime(src):
+        return out
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    for cmd in _helper_compilers():
+        if subprocess.run(cmd + ["-o", out, src], capture_output=True).returncode == 0 and os.path.isfile(out):
+            return out
+    return None
+
+
 def demangle_many(names):
-    """the demangled names, as `c++filt -n` gives them (the same count and order); needs c++filt (binutils, on PATH) or `pip install cxxfilt`"""
+    """the demangled names in the same count and order, like `c++filt -n`: with c++filt (binutils) or llvm-cxxfilt where they are on PATH, else
+    with tools/demangle.cpp (built once from Zig's or a C++ compiler's libc++abi: that is what Windows uses)"""
     names = list(names)
     exe = shutil.which("c++filt") or shutil.which("llvm-cxxfilt")
-    if exe:
-        out = subprocess.run([exe, "-n"], input="\n".join(names), capture_output=True, text=True).stdout.split("\n")
-        return out[:len(names)]
-    try:
-        import cxxfilt
-    except ImportError:
-        raise SystemExit("no c++filt on PATH (binutils) and no cxxfilt module: `pip install cxxfilt` (tools/requirements.txt)")
-    out = []
-    for n in names:
-        try:
-            out.append(cxxfilt.demangle(n))
-        except Exception:
-            out.append(n)
-    return out
+    if not exe:
+        exe = _demangle_helper()
+    if not exe:
+        raise SystemExit("no C++ demangler: install binutils (Linux: sudo apt install binutils), or on Windows run `python build.py setup-zig` "
+                         "(the setup does this for you), then try again")
+    cmd = [exe, "-n"] if os.path.basename(exe).lower().startswith(("c++filt", "llvm-cxxfilt")) else [exe]
+    r = subprocess.run(cmd, input="\n".join(names).encode("utf-8"), capture_output=True)
+    out = r.stdout.decode("utf-8", "replace").replace("\r", "").split("\n")
+    if r.returncode or len(out) < len(names):
+        raise SystemExit("the C++ demangler (%s) failed (exit %d): %s" % (exe, r.returncode, r.stderr.decode("utf-8", "replace")[:300]))
+    return out[:len(names)]
 
 
 def _font_dirs():

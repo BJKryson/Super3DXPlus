@@ -69,7 +69,7 @@ physics recompiled from `main`; `src/phys/phys_rc.c` is about 18 MB). Both stay 
 | a C compiler | **Zig** (`python build.py setup-zig`, no installer) or MinGW-w64 (MSYS2: `pacman -S mingw-w64-x86_64-gcc`) | gcc or clang (`apt install build-essential`) |
 | SDL2 development files | `python build.py setup-sdl2` (the mingw package, from libsdl.org's release) | `apt install libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev` |
 | ffmpeg with the Bink decoder (sound, movies) | a full build: `winget install Gyan.FFmpeg`, or set `FFMPEG` | `apt install ffmpeg` |
-| a C++ demangler | installed by the `cxxfilt` package in `tools/requirements.txt` | `c++filt` (binutils) |
+| a C++ demangler | built automatically with Zig (`tools/demangle.cpp`); nothing to install | `c++filt` (binutils; or any C++ compiler builds the helper) |
 | fonts for a few menu pictures | Arial (already there); the converter looks in `C:\Windows\Fonts` | Nimbus Sans / DejaVu (`apt install fonts-urw-base35 fonts-dejavu fonts-noto-cjk`) |
 
 The converters draw a few pictures' text (the versus selector's discs, the "?" of the special vehicles button, the save screen's

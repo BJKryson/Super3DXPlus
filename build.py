@@ -201,6 +201,8 @@ def build_exe(target, cc, opt, jobs):
         flags += ["-D__USE_MINGW_ANSI_STDIO=1", "-DWMMT_WIN", "-DGL_APICALL=", "-D_POSIX_THREAD_SAFE_FUNCTIONS", "-D_FILE_OFFSET_BITS=64",
                   "-include", "platform/sdl2/winport.h", "-Iplatform/sdl2/winshim", "-I" + os.path.join(sdl, "include", "SDL2")]
         link = ["-L" + os.path.join(sdl, "lib"), "-lmingw32", "-lSDL2main", "-lSDL2", "-lm", "-lws2_32", "-ladvapi32"]
+        # what the static SDL2 itself needs from Windows (MinGW links most of these by default, Zig does not)
+        link += ["-luser32", "-lgdi32", "-lwinmm", "-limm32", "-lversion", "-lsetupapi", "-lole32", "-loleaut32", "-lcfgmgr32", "-lshell32", "-luuid"]
         if tc.kind == "gcc":
             link += ["-static-libgcc", "-Wl,-Bstatic,--whole-archive", "-lwinpthread", "-Wl,--no-whole-archive,-Bdynamic"]
         exe = os.path.join(out, "super3dx.exe")
@@ -348,7 +350,7 @@ def doctor():
             line("python module " + m, "ok", "")
         except ImportError:
             line("python module " + m, None, "pip install -r tools/requirements.txt")
-    line("c++filt or cxxfilt", which("c++filt", "llvm-cxxfilt") or ("cxxfilt module" if _has("cxxfilt") else None), "pip install cxxfilt")
+    line("C++ demangler", which("c++filt", "llvm-cxxfilt") or ("built with Zig or a C++ compiler" if (find_zig() or which("g++", "clang++")) else None), "python build.py setup-zig (Windows) or apt install binutils")
     line("ffmpeg (for the sound/movies)", os.environ.get("FFMPEG") or which("ffmpeg"), "a full build with the Bink decoder: winget install Gyan.FFmpeg, apt install ffmpeg")
     say("compilers:")
     line("zig", find_zig(), "python build.py setup-zig")
@@ -401,7 +403,7 @@ def step(n, total, title):
 
 def ensure_modules():
     """the Python packages the converters use; installs them, in a private virtual environment if the system Python refuses"""
-    missing = [m for m in REQ_MODULES if not _has(m)] + (["cxxfilt"] if os.name == "nt" and not _has("cxxfilt") else [])
+    missing = [m for m in REQ_MODULES if not _has(m)]
     if not missing:
         say("Python packages: all there.")
         return
