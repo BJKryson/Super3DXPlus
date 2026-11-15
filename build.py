@@ -33,7 +33,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.join(ROOT, ".super3dx")  # downloaded toolchain pieces (git-ignored)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-from setupkit import ask, yes, step, run_logged, explain_failure, ISSUES  # noqa: E402  (the guided setups' shared helpers)
+from setupkit import ask, yes, step, run_logged, explain_failure, find_game, browse_folder, ISSUES  # noqa: E402  (the guided setups' shared helpers)
 SDL_VER = "2.30.9"
 ZIG_VER = "0.17.1"
 ZIG = {  # (url, sha256) from ziglang.org/download/index.json
@@ -419,31 +419,6 @@ def find_ffmpeg():
     return None
 
 
-def find_game(path):
-    """the folder holding `main` and `data/`: the path itself, or one level inside it"""
-    path = os.path.abspath(os.path.expanduser(path))
-    if not os.path.isdir(path):
-        return None
-    for cand in [path] + sorted(os.path.join(path, d) for d in os.listdir(path)):
-        if os.path.isfile(os.path.join(cand, "main")) and os.path.isdir(os.path.join(cand, "data")):
-            return cand
-    return None
-
-
-def browse_folder():
-    try:
-        import tkinter
-        from tkinter import filedialog
-        root = tkinter.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        p = filedialog.askdirectory(title="Choose the folder with your copy of the game (it has main and data inside)")
-        root.destroy()
-        return p
-    except Exception:
-        return ""
-
-
 def preflight():
     """problems that would only show up an hour into the build; returns a message, or None if all is well"""
     if sys.version_info < (3, 9):
@@ -502,13 +477,13 @@ def read_info(folder):
         return None
 
 
-def write_info(folder, md5, region):
+def write_info(folder, md5, region, game=None):
     import json, time
     commit = None
     if which("git") and os.path.isdir(os.path.join(ROOT, ".git")):
         r = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True)
         commit = r.stdout.strip() or None
-    json.dump({"tools": tools_hash(), "main_md5": md5, "region": region, "built": time.strftime("%Y-%m-%d %H:%M"), "source_commit": commit},
+    json.dump({"tools": tools_hash(), "main_md5": md5, "region": region, "built": time.strftime("%Y-%m-%d %H:%M"), "source_commit": commit, "game_dir": game},
               open(os.path.join(folder, "build-info.json"), "w", encoding="utf-8"), indent=1)
 
 
@@ -665,7 +640,7 @@ def wizard(folder, opt, jobs, full=False):
         except PermissionError:
             say("\nThe game could not be updated because a file is in use: close the game (and any window showing that folder) and run setup again.")
             return 1
-        write_info(dest, md5, region)
+        write_info(dest, md5, region, game)
         say("Updated in %d minutes." % ((time.time() - t0) // 60))
     else:
         pk = os.path.join(built, "package")
@@ -677,7 +652,7 @@ def wizard(folder, opt, jobs, full=False):
                 shutil.copytree(os.path.join(dest, "save"), os.path.join(pk, "save"), dirs_exist_ok=True)
             os.replace(dest, old)
         os.replace(pk, dest)
-        write_info(dest, md5, region)
+        write_info(dest, md5, region, game)
         if old:
             shutil.rmtree(old, ignore_errors=True)
         say("Built in %d minutes." % ((time.time() - t0) // 60))
@@ -695,10 +670,38 @@ def wizard(folder, opt, jobs, full=False):
     return 0
 
 
+def _guided(which_one, jobs):
+    """the Raspberry Pi / Android setups (tools/setup_pi.py, tools/setup_android.py): run after the main setup"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except Exception:
+            pass
+    try:
+        ensure_modules()
+        mod = __import__("setup_pi" if which_one == "pi" else "setup_android")
+        sys.exit(mod.run(os.path.abspath(__file__), jobs))
+    except KeyboardInterrupt:
+        sys.exit("\nStopped. Run it again whenever you like.")
+    except SystemExit as e:
+        if isinstance(e.code, str):
+            say("\n" + "!" * 78 + "\n" + e.code.replace("build.py: ", "", 1) + "\n" + "!" * 78)
+            sys.exit(1)
+        raise
+    except Exception:
+        import traceback
+        err = os.path.join(ROOT, "build", "logs", "setup-error.txt")
+        os.makedirs(os.path.dirname(err), exist_ok=True)
+        open(err, "w", encoding="utf-8").write(traceback.format_exc())
+        say("\n" + "!" * 78 + "\nThe setup hit an unexpected problem (it is a bug in the setup, not your fault).\n"
+            "Please open an issue at %s and attach this file:\n\n    %s\n" % (ISSUES, err) + "!" * 78)
+        sys.exit(1)
+
+
 def main():
     os.environ["PYTHONUTF8"] = "1"  # every Python tool this starts reads and writes UTF-8 (the Windows default, cp1252, cannot hold the Japanese text)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "refresh", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
+    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "pi", "android", "gensrc", "refresh", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
     ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data, all and wizard)")
     ap.add_argument("--target", choices=["windows", "linux", "pi"], default="windows" if os.name == "nt" else "linux")
     ap.add_argument("--cc", help="the C compiler command to use (e.g. 'zig cc -target x86_64-windows-gnu')")
@@ -725,6 +728,14 @@ def main():
             say("\n" + "!" * 78 + "\nThe setup hit an unexpected problem (it is a bug in the setup, not your fault).\n"
                 "Please open an issue at %s and attach this file:\n\n    %s\n" % (ISSUES, err) + "!" * 78)
             sys.exit(1)
+    if a.cmd == "gensrc":
+        if not a.arcade:
+            die("gensrc needs the arcade dump folder")
+        pipeline("gen", a.arcade, "--phys")
+        return
+    if a.cmd in ("pi", "android"):
+        _guided(a.cmd, a.jobs)
+        return
     if a.cmd == "refresh":
         if not a.arcade:
             die("refresh needs the arcade dump folder")

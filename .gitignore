@@ -41,3 +41,8 @@ __pycache__/
 
 # toolchain pieces build.py downloads, and what it makes
 /.super3dx/
+
+# what the setup makes next to the sources: the finished games hold the game's data, so they must never be committed
+/Super3DXPlus-*/
+/Super3DXPlus-*.old/
+/Super3DXPlus-*.apk

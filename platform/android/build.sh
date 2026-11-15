@@ -6,7 +6,7 @@
 #   JAVA_HOME      a JDK (17 works)
 #   VK=0           OpenGL ES 3 instead of Vulkan
 #
-# Needs the generated sources (tools/gen_from_original.sh --phys) and tools/vkprogs. It does not install
+# Needs the generated sources (python build.py gensrc <your game folder>) and tools/vkprogs. It does not install
 # or push anything: platform/android/deploy.ps1 (Windows, adb on USB) does.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -23,7 +23,7 @@ case "$(basename "$BT")" in
   [0-9]|[0-9].*|[12][0-9].*|3[0-4].*) echo "build-tools $(basename "$BT") is too old: zipalign -P needs 35 or newer" >&2; exit 1 ;;
 esac
 for f in src/phys/phys_rc.c src/phys/rc_addr.h src/cardb.h; do
-  [ -f "$f" ] || { echo "missing $f: run tools/gen_from_original.sh <arcade root> --phys first" >&2; exit 1; }
+  [ -f "$f" ] || { echo "missing $f: run python build.py gensrc <your game folder> first" >&2; exit 1; }
 done
 OUT=build/android
 rm -rf "$OUT/apk" "$OUT/classes" && mkdir -p "$OUT/apk/lib/arm64-v8a" "$OUT/classes" "$OUT/obj" "$OUT/res"

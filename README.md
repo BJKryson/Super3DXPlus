@@ -28,9 +28,15 @@ You can't. Any pre-built binaries you see online are unauthorized distributions 
 3. Follow the prompts. It installs what it needs (it will offer to install Python and ffmpeg if you don't have them), asks you to pick your game folder, and builds everything.
 4. When it says it's done, it tells you which folder your game is in. Open it and double-click **`super3dx.exe`**.
 
-**Linux / Raspberry Pi / macOS**
+**Linux / macOS**
 
 Download the code, open a terminal in its folder and run `./setup.sh`. It installs the Python packages by itself, and tells you the one `apt install` command to run if a compiler or SDL2 is missing.
+
+**Raspberry Pi and Android** (after the setup above)
+
+Run **`setup-pi.bat`** / `./setup-pi.sh` to build and install the game on a Raspberry Pi over your network, or **`setup-android.bat`** / `./setup-android.sh` to build one self-contained Android app (and install it on a phone connected by USB). They download what they need and ask before anything big.
+
+**Updating:** when there is a new version, download it (or `git pull`) and run the setup again. It only redoes what changed: usually just the game program, in a few minutes, keeping your data and saves.
 
 **If something goes wrong:** the setup stops with a plain-language explanation of what probably happened and what to do, and saves a full log in `build/logs/` (named `setup-<date>.txt`). If you are stuck, open an issue and attach that file. `docs/BUILDING.md` has a list of common problems and their fixes.
 

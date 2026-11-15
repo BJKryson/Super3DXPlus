@@ -124,3 +124,63 @@ def explain_failure(log, rc):
     say("If you are still stuck, open an issue at %s and attach that log file (or paste its last 50 lines)." % ISSUES)
     say("!" * 78)
 
+
+def find_game(path):
+    """the folder holding `main` and `data/`: the path itself, or one level inside it"""
+    path = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isdir(path):
+        return None
+    for cand in [path] + sorted(os.path.join(path, d) for d in os.listdir(path)):
+        if os.path.isfile(os.path.join(cand, "main")) and os.path.isdir(os.path.join(cand, "data")):
+            return cand
+    return None
+
+
+def browse_folder():
+    try:
+        import tkinter
+        from tkinter import filedialog
+        root = tkinter.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        p = filedialog.askdirectory(title="Choose the folder with your copy of the game (it has main and data inside)")
+        root.destroy()
+        return p
+    except Exception:
+        return ""
+
+
+def choose_build(what):
+    """the finished build (a Super3DXPlus-<version> folder made by the main setup) that `what` should use, and the game folder it came from;
+    returns (folder, info, game) or None after saying what to do"""
+    import json
+    builds = []
+    for name in sorted(os.listdir(ROOT)):
+        d = os.path.join(ROOT, name)
+        if name.startswith("Super3DXPlus-") and os.path.isfile(os.path.join(d, "build-info.json")) and os.path.isdir(os.path.join(d, "data")):
+            try:
+                builds.append((d, json.load(open(os.path.join(d, "build-info.json"), encoding="utf-8"))))
+            except ValueError:
+                pass
+    if not builds:
+        say("\nI cannot find a finished build. Run the main setup first (setup.bat / ./setup.sh), then run this again.")
+        return None
+    if len(builds) == 1:
+        folder, info = builds[0]
+    else:
+        say("\nMore than one build was found:")
+        for i, (d, inf) in enumerate(builds, 1):
+            say("  %d) %s  (%s version, built %s)" % (i, os.path.basename(d), inf.get("region", "?"), inf.get("built", "?")))
+        pick = ask("Which one goes on the %s? [1] " % what, "1")
+        folder, info = builds[int(pick) - 1] if pick.isdigit() and 1 <= int(pick) <= len(builds) else builds[0]
+    say("Using: %s (%s version)" % (folder, info.get("region", "?")))
+    game = info.get("game_dir")
+    if not game or not os.path.isfile(os.path.join(game, "main")):
+        say("\nI need your game folder again (to regenerate the sources for this version).")
+        game = None
+        while not game:
+            a = ask("Paste the game folder here, or press Enter to browse (q to quit): ")
+            if a.lower() == "q":
+                return None
+            game = find_game(a or browse_folder() or "")
+    return folder, info, game

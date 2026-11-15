@@ -32,6 +32,11 @@ if not defined PY (
 )
 
 :run
-%PY% build.py wizard %*
+if "%~1"=="" goto wiz
+%PY% build.py %*
+goto done
+:wiz
+%PY% build.py wizard
+:done
 echo.
 pause

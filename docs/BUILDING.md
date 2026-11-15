@@ -13,7 +13,14 @@ same). It:
 3. converts the data and builds the player (an hour or more, nothing to click);
 4. moves the result to `Super3DXPlus-Export/` or `Super3DXPlus-JP/` next to the sources (never over an earlier one, since that may hold saves).
 
-To build the other version too, run it again and pick the other game folder. Everything it prints is also saved in `build/logs/setup-<date>.txt`; if it
+To build the other version too, run it again and pick the other game folder.
+
+**Updating.** After a new version of Super3DX+ (`git pull` in a checkout, or a new ZIP copied over the old folder, keeping your `Super3DXPlus-*` folders and `.super3dx`),
+run the setup again. Each finished build carries a `build-info.json` (a fingerprint of the data tools, the game's `main`, the date and the source commit). If the data
+tools have not changed it only regenerates the sources and rebuilds the player (a few minutes) and leaves the data and `save/` alone; if they changed, it converts the data
+again (about an hour) and copies your saves into the new build. `python build.py wizard --full` forces a complete rebuild. In a git checkout the setup also offers to `git pull` first.
+
+**Raspberry Pi and Android.** Run `setup-pi.bat` / `./setup-pi.sh` and `setup-android.bat` / `./setup-android.sh` after the main setup (below). Everything it prints is also saved in `build/logs/setup-<date>.txt`; if it
 stops, it says in plain words what probably happened and what to do. If you ask for help, attach that file.
 
 ## By hand, start to finish (Windows)
@@ -106,6 +113,13 @@ Run it: double-click `super3dx.exe` (it takes `data/` and `save/` from beside it
 
 ## Raspberry Pi 5
 
+**The easy way:** `setup-pi.bat` (Windows) or `./setup-pi.sh`, after the main setup. Flash 64-bit Raspberry Pi OS Lite onto the card with Raspberry Pi Imager (in its
+settings: set a user name and password, tick "Enable SSH"), start the Pi on your network, and run it. It asks for the Pi's address and user, installs an SSH key (the Pi's
+password is asked once), installs the packages, builds the player on the Pi, sends the data (only when it changed), installs the service that starts the game at boot and, for
+composite video, sets the Pi 5's video output (it keeps a `.super3dx.bak` of `config.txt` and `cmdline.txt`) and offers to restart. Run it again after an update: it only sends
+what changed. Its log is `build/logs/setup-pi-<date>.txt`. It needs `ssh` on your PC (Windows 10/11: Settings > Optional features > OpenSSH Client). By hand, with the older
+scripts and cross compiling:
+
 On the Pi itself: install the dependencies as for Linux, then `python3 build.py data ...` is not needed there: build the data on a PC and copy
 `data/` over (`tools/pi/install.sh` does it), and build the player on the Pi with `python3 build.py exe --target pi` (a few minutes).
 From another machine: `tools/pi/sysroot.sh` makes an arm64 sysroot, then `SYSROOT=/opt/pi-sysroot python3 build.py exe --target pi`.
@@ -113,8 +127,16 @@ Preparing the card, the service and the composite (or HDMI) output: `docs/PI.md`
 
 ## Android
 
-`platform/android/build.sh` builds the APK (needs the Android SDK and NDK: `tools/dev/setup_wsl.sh --android` on Ubuntu installs them) after
-`python tools/pipeline.py gen <dump> --phys`; `platform/android/deploy.ps1` installs it on a phone over USB. See the comments in both.
+**The easy way:** `setup-android.bat` (Windows) or `./setup-android.sh`, after the main setup. It finds a JDK 17+ and the Android SDK (build-tools 35, a platform and an NDK), or
+downloads them into `.super3dx/` (about 3 GB; you accept Google's Android SDK licence terms first), builds one self-contained APK with the game's data inside
+(`Super3DXPlus-<version>-Android.apk`, about 1 GB, Android 9+ on a 64-bit ARM device with Vulkan) and, if a phone with USB debugging is connected, installs it. Japan and Export
+get different app ids (`com.wmmt.port`, `com.wmmt.port.export`), so both can be installed. The APK is signed with a key made on first use and kept in
+`.super3dx/android/debug.keystore`: **keep it**, because Android only installs an update over an app signed with the same key (a different key means uninstalling first, which
+deletes the app's saves). Its log is `build/logs/setup-android-<date>.txt`.
+
+By hand: `python platform/android/build_apk.py --sdk <Android SDK> --jdk <JDK> --out app.apk [--pkg ... --label ... --embed <data folder>]` (the same on every OS), or the older
+`platform/android/build.sh` (bash; `tools/dev/setup_wsl.sh --android` installs its tools on Ubuntu), after `python build.py gensrc <your game folder>`;
+`platform/android/deploy.ps1` installs over USB.
 
 ## Problems
 

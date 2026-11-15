@@ -6,6 +6,12 @@ arcade's rate) with the textures at 4x anisotropic filtering, at 53 °C at most 
 sampled every 5 s, the CPU at ~18% of one core). First boot to the game on a CRT was tested on 2026-11-05 with the Export
 (English) data, a Pi 5 8 GB, a Sony Trinitron, a USB audio device and an Xbox 360 pad. Status: it works; see "Not done yet".
 
+## The easy way
+
+Run `setup-pi.bat` (Windows) or `./setup-pi.sh` after the main setup (`docs/BUILDING.md`). With a Pi that is on your network with SSH enabled (Raspberry Pi Imager's
+settings: user name, password, "Enable SSH"), it builds the player on the Pi, installs the game and the boot service, and sets up composite or HDMI output. The sections
+below describe what it does and the by-hand way (a prepared card, `tools/pi/install.sh`, cross compiling).
+
 ## What you need
 
 - A Pi 5 (4 GB or 8 GB), a 32 GB SD card (the Export data is 2.5 GB), a CRT (or anything with a composite input), Ethernet for
