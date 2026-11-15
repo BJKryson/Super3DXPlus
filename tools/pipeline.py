@@ -458,7 +458,11 @@ def main():
     sub.add_parser("steps")
     a = ap.parse_args()
     if a.cmd == "gen":
-        gen(a.arcade, a.phys)
+        try:
+            gen(a.arcade, a.phys)
+        except subprocess.CalledProcessError as e:
+            tool = [os.path.relpath(str(c), ROOT) if str(c).startswith(ROOT) else str(c) for c in e.cmd[1:3]]
+            sys.exit("GENERATION STOPPED: a generator step failed (exit code %s): %s\n  The tool's own error message is just above." % (e.returncode, " ".join(tool)))
     elif a.cmd == "convert":
         convert(a.arcade, not a.no_media, a.only, a.keep_going)
     else:

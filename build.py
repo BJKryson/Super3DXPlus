@@ -66,8 +66,12 @@ def which(*names):
 def download(url, dest, sha256=None):
     say("downloading", url)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    with urllib.request.urlopen(url, timeout=60) as r, open(dest + ".part", "wb") as f:
-        shutil.copyfileobj(r, f)
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r, open(dest + ".part", "wb") as f:
+            shutil.copyfileobj(r, f)
+    except OSError as e:  # (URLError, timeouts, a full disk, a refused write are all OSErrors)
+        die("could not download %s\n  (%s)\n  Check your internet connection (a firewall, VPN or proxy can block it) and run this again.\n"
+            "  Or download that file yourself, in a browser, and save it as:\n    %s" % (url, e, dest))
     if sha256:
         h = hashlib.sha256(open(dest + ".part", "rb").read()).hexdigest()
         if h != sha256:
@@ -159,9 +163,12 @@ def newer(src, dst):
 
 
 def run(cmd, **kw):
-    r = subprocess.run(cmd, **kw)
+    try:
+        r = subprocess.run(cmd, **kw)
+    except OSError as e:
+        die("could not start %s: %s" % (cmd[0], e))
     if r.returncode:
-        die("failed: " + " ".join(cmd[:3]) + " ... (exit %d)" % r.returncode)
+        die("a build command failed (exit code %d): %s ...\n  The compiler's or tool's own message is just above this line." % (r.returncode, " ".join(str(c) for c in cmd[:4])))
 
 
 def gl_names():
@@ -454,9 +461,127 @@ def browse_folder():
         return ""
 
 
+def run_logged(cmd, logpath):
+    """run a command, showing its output as it comes and keeping a copy in logpath; returns its exit code"""
+    os.makedirs(os.path.dirname(logpath), exist_ok=True)
+    env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONUTF8="1")
+    with open(logpath, "w", encoding="utf-8", errors="replace") as lf:
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=ROOT,
+                             text=True, encoding="utf-8", errors="replace", bufsize=1)
+        try:
+            for line in p.stdout:
+                say(line.rstrip("\r\n"))
+                lf.write(line)
+                lf.flush()
+            return p.wait()
+        except BaseException:
+            p.terminate()
+            raise
+
+
+# what a failure's log says, and what to do about it (first match wins; the plain advice comes before the technical lines)
+DIAGNOSES = [
+    (r"no ffmpeg", "ffmpeg is not installed (it converts the game's sound and movies).\n"
+                   "  Windows: open a terminal and run   winget install Gyan.FFmpeg   (or get the 'full' build from https://www.gyan.dev/ffmpeg/builds/)\n"
+                   "  Linux: sudo apt install ffmpeg\n  Then run setup again."),
+    (r"no compiler for Windows|no SDL2 development files|no C compiler", "A build tool is missing or was not downloaded properly.\n"
+                   "  Run   python build.py doctor   to see what is missing, then run setup again."),
+    (r"WinError 206|filename or extension is too long|File name too long|Filename too long|WinError 3\]|No such file or directory: '[A-Za-z]:\\\\.{200,}",
+     "A file path got too long for Windows. Move the whole project folder somewhere short, such as C:\\Super3DXPlus, and run setup again."),
+    (r"No space left|WinError 112|Errno 28|not enough space|disk is full",
+     "The drive ran out of space. The build needs about 15 GB free. Free some space (or move the project folder to a bigger drive) and run setup again."),
+    (r"MemoryError|Cannot allocate memory|out of memory",
+     "The computer ran out of memory. Close other programs (browsers especially) and run setup again."),
+    (r"PermissionError|Access is denied|WinError 5\]|WinError 32|being used by another process|Permission denied",
+     "Windows (or an antivirus program) would not let the build write or delete a file.\n"
+     "  Close anything that may be using this folder (File Explorer windows inside it, a running copy of the game), pause your antivirus for the\n"
+     "  build or add this folder to its exclusions, make sure the folder is somewhere you can write to (not Program Files), and run setup again."),
+    (r"URLError|getaddrinfo|Temporary failure in name resolution|timed out|could not download",
+     "A download failed. Check your internet connection (a firewall, VPN or proxy can block it) and run setup again."),
+    (r"UnicodeEncodeError|UnicodeDecodeError",
+     "A text-encoding problem. This is a bug in the setup, not something you did wrong: please report it (details below)."),
+    (r"has no main and data|has no main|has no data",
+     "The game folder you chose is not what the setup expects: it must contain a file called `main` and a folder called `data`."),
+    (r"phys_rc\.c",
+     "The physics source was not generated. Run setup again from the start (it makes it in the first minutes)."),
+    (r"GENERATION STOPPED",
+     "The tools could not read your game's `main` file. The usual causes are a version of the game this project does not support\n"
+     "  (docs/BUILDS.md lists the ones that work) or an incomplete or damaged copy of the game. Check that you copied all of it, and that `main` is the\n"
+     "  game's real executable (tens of MB), not a shortcut or an empty file."),
+    (r"CONVERSION STOPPED",
+     "One of the data conversion steps failed. The line above this one says which; the lines before it show the converter's own message.\n"
+     "  Run   python tools/pipeline.py convert <your game folder> --only <that step>   after fixing the cause to retry just that step."),
+    (r"No module named",
+     "A Python package is missing. Run   python -m pip install -r tools/requirements.txt   and then setup again."),
+]
+
+
+def explain_failure(log, rc):
+    """print what went wrong in plain words, from the log of a failed build"""
+    text = open(log, encoding="utf-8", errors="replace").read()
+    lines = [l for l in text.splitlines() if l.strip()]
+    hint = next((h for pat, h in DIAGNOSES if re.search(pat, text)), None)
+    step = None
+    for l in reversed(lines):
+        m = re.match(r"^(\S+)\s+FAILED", l) or re.search(r"CONVERSION STOPPED at step '([^']+)'", l)
+        if m:
+            step = m.group(1)
+            break
+    say("\n" + "!" * 78)
+    say("The build stopped before it finished.%s" % ((" It failed at: " + step) if step else ""))
+    say("")
+    if hint:
+        say("What probably happened, and what to do:\n  " + hint)
+    else:
+        say("I do not recognise this error. The last lines of the log were:\n")
+        for l in lines[-12:]:
+            say("    " + l[:160])
+    say("")
+    say("Nothing was damaged. Once the cause is fixed, run setup again (it redoes the data step from the beginning).")
+    say("The full log is in:  " + log)
+    say("If you are still stuck, open an issue at %s and attach that log file (or paste its last 50 lines)." % ISSUES)
+    say("!" * 78)
+
+
+def preflight():
+    """problems that would only show up an hour into the build; returns a message, or None if all is well"""
+    if sys.version_info < (3, 9):
+        return "Python %d.%d is too old: Super3DX+ needs Python 3.9 or newer (https://www.python.org/downloads/)." % sys.version_info[:2]
+    try:
+        os.makedirs(TOOLS, exist_ok=True)
+        probe = os.path.join(TOOLS, ".write-test")
+        open(probe, "w").write("x")
+        os.remove(probe)
+    except OSError as e:
+        return ("I cannot write to the project folder (%s).\n  Move the folder somewhere you can write, such as C:\\Super3DXPlus or your home folder, "
+                "not Program Files or a read-only location, and run setup again.\n  (%s)" % (ROOT, e))
+    if os.name == "nt" and len(ROOT) > 70:
+        return ("WARN:This folder's path is long (%d characters) and Windows can fail on very long paths during the build.\n  Moving the project folder "
+                "closer to the drive's root, such as C:\\Super3DXPlus, avoids that." % len(ROOT))
+    try:
+        ROOT.encode("ascii")
+    except UnicodeEncodeError:
+        return ("WARN:This folder's path has characters other than plain English letters and digits, which some of the build tools may not handle.\n"
+                "  Moving the project folder to a simple path, such as C:\\Super3DXPlus, avoids that.")
+    return None
+
+
 def wizard(folder, opt, jobs):
     target = "windows" if os.name == "nt" else "linux"
     total = 4
+    for stream in (sys.stdout, sys.stderr):  # a Windows console that cannot show a character must not stop the build
+        try:
+            stream.reconfigure(errors="replace")
+        except Exception:
+            pass
+    problem = preflight()
+    if problem and problem.startswith("WARN:"):
+        say("\nNote: " + problem[5:])
+        if not yes("Carry on anyway?", False):
+            return 1
+    elif problem:
+        say("\nCannot start: " + problem)
+        return 1
     say("")
     say("Super3DX+ setup")
     say("This builds the game from YOUR OWN copy of Wangan Midnight Maximum Tune 3DX+. It needs an internet connection for a few small")
@@ -536,17 +661,16 @@ def wizard(folder, opt, jobs):
     step(3, total, "convert the data and build the game (about an hour; nothing to click)")
     import time
     t0 = time.time()
+    log = os.path.join(ROOT, "build", "logs", "setup-%s.txt" % time.strftime("%Y%m%d-%H%M%S"))
+    say("(everything below is also saved in %s)\n" % os.path.relpath(log, ROOT))
+    cmd = [sys.executable, os.path.abspath(__file__), "all", game, "--target", target, "-O" + opt, "-j", str(jobs)]
     try:
-        pipeline("gen", game, "--phys")
-        pipeline("convert", game)
-        build_exe(target, None, opt, jobs)
-        package(target)
-    except SystemExit as e:
-        say("\n" + "!" * 78)
-        say("Something went wrong: %s" % (e.code if isinstance(e.code, str) else "exit code %s" % e.code))
-        say("Details are in the folder build/logs/ (one file per step). Once the cause is fixed, run this again.")
-        say("If you are stuck, open an issue at %s and attach the newest file from build/logs/." % ISSUES)
-        say("!" * 78)
+        rc = run_logged(cmd, log)
+    except KeyboardInterrupt:
+        say("\nStopped. Nothing is broken: run setup again whenever you like (it starts over from the beginning).")
+        return 1
+    if rc:
+        explain_failure(log, rc)
         return 1
 
     # 4 ------------------------------------------------------------------------------------------------------------
@@ -583,7 +707,23 @@ def main():
     ap.add_argument("--no-media", action="store_true", help="data: skip the sounds, music and movies")
     a = ap.parse_args()
     if a.cmd == "wizard":
-        sys.exit(wizard(a.arcade, a.opt, a.jobs))
+        try:
+            sys.exit(wizard(a.arcade, a.opt, a.jobs))
+        except KeyboardInterrupt:
+            sys.exit("\nStopped. Run setup again whenever you like.")
+        except SystemExit as e:  # a plain-language message from a helper (a failed download, a missing tool...)
+            if isinstance(e.code, str):
+                say("\n" + "!" * 78 + "\n" + e.code.replace("build.py: ", "", 1) + "\n" + "!" * 78)
+                sys.exit(1)
+            raise
+        except Exception:
+            import traceback
+            err = os.path.join(ROOT, "build", "logs", "setup-error.txt")
+            os.makedirs(os.path.dirname(err), exist_ok=True)
+            open(err, "w", encoding="utf-8").write(traceback.format_exc())
+            say("\n" + "!" * 78 + "\nThe setup hit an unexpected problem (it is a bug in the setup, not your fault).\n"
+                "Please open an issue at %s and attach this file:\n\n    %s\n" % (ISSUES, err) + "!" * 78)
+            sys.exit(1)
     if a.cmd == "doctor":
         doctor()
     elif a.cmd == "setup-zig":

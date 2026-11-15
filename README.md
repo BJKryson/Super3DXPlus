@@ -67,9 +67,9 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 
 Download the code, open a terminal in its folder and run `./setup.sh`. It installs the Python packages by itself, and tells you the one `apt install` command to run if a compiler or SDL2 is missing.
 
-**If something goes wrong:** the error says which step failed, and every step writes a log to `build/logs/`. Open an issue and attach the newest log file. `python build.py doctor` lists what is installed and what is missing.
+**If something goes wrong:** the setup stops with a plain-language explanation of what probably happened and what to do, and saves a full log in `build/logs/` (named `setup-<date>.txt`). If you are stuck, open an issue and attach that file. `docs/BUILDING.md` has a list of common problems and their fixes.
 
-**Other things you can do:** build the Japan and Export versions side by side (run setup again with the other game folder), run the steps by hand, or build for the Raspberry Pi and Android: see `docs/BUILDING.md`, `docs/PI.md` and `docs/INPUT.md` for controls.
+**Prefer to do it by hand, or build for something else?** `docs/BUILDING.md` has the complete manual steps for Windows and Linux (no installer), the individual build commands, and the Raspberry Pi and Android builds (also `docs/PI.md`). Controls and remapping are in `docs/INPUT.md`. To build both the Japan and Export versions, run the setup again and pick the other game folder.
 
 ## Layout
 

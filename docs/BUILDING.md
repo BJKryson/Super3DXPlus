@@ -1,6 +1,58 @@
 # Building
 
-**The easy way:** double-click `setup.bat` (Windows) or run `./setup.sh` (Linux, macOS). It does everything below for you and asks only where your game is. The rest of this page is for doing the steps by hand.
+## The easy way: the setup
+
+Windows: double-click `setup.bat`. Linux, macOS, Raspberry Pi: run `./setup.sh`. Both start `python build.py wizard` (plain `python build.py` does the
+same). It:
+
+1. installs what it can by itself: Python (Windows, with your OK, through winget), the Python packages (in a private environment under `.super3dx/venv`
+   if the system Python refuses them), the Zig compiler and the SDL2 library (downloaded into `.super3dx/`), and ffmpeg (Windows, with your OK, through
+   winget). On Linux it cannot use `sudo` for you, so it prints the one `apt install` line to run and stops;
+2. asks for your copy of the game (a folder with `main` and `data/`; it opens a folder picker, or you can paste or drag the folder into the window),
+   and tells you whether it is the Japan or the Export version;
+3. converts the data and builds the player (an hour or more, nothing to click);
+4. moves the result to `Super3DXPlus-Export/` or `Super3DXPlus-JP/` next to the sources (never over an earlier one, since that may hold saves).
+
+To build the other version too, run it again and pick the other game folder. Everything it prints is also saved in `build/logs/setup-<date>.txt`; if it
+stops, it says in plain words what probably happened and what to do. If you ask for help, attach that file.
+
+## By hand, start to finish (Windows)
+
+The setup does exactly this; do it yourself if you want control over where things go.
+
+1. Install [Python 3.9 or newer](https://www.python.org/downloads/) (tick "Add python.exe to PATH") and, optionally, [Git](https://git-scm.com/).
+2. Get the sources: `git clone https://github.com/smolderyguest/Super3DXPlus.git`, or download the ZIP from GitHub and unzip it to a short path such as
+   `C:\Super3DXPlus` (very long paths and non-English characters in the path can make Windows tools fail).
+3. In a terminal in that folder:
+   ```
+   pip install -r tools/requirements.txt
+   python build.py setup-zig
+   python build.py setup-sdl2
+   winget install Gyan.FFmpeg
+   python build.py doctor
+   python build.py all "C:\path\to\your\game\folder"
+   ```
+   (`doctor` lists anything still missing. If `winget` is not available, install the "full" ffmpeg build from https://www.gyan.dev/ffmpeg/builds/ and put
+   it on PATH, or set the `FFMPEG` environment variable to the ffmpeg.exe.)
+4. Run `build\windows\package\super3dx.exe`. Copy or zip the `package` folder to keep or move the game.
+
+On Linux: `sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev ffmpeg python3-pip python3-venv`, then
+`pip install -r tools/requirements.txt` (use a virtual environment if pip refuses: `python3 -m venv .venv && . .venv/bin/activate`), then
+`python3 build.py all /path/to/your/game/folder`; run `build/linux/package/play.sh`.
+
+## If something goes wrong
+
+- The setup's log is `build/logs/setup-<date>.txt`; each conversion step also has its own `build/logs/<step>.log`. Open an issue and attach the newest.
+- "no ffmpeg", "no compiler", "no SDL2": run `python build.py doctor`; it names each missing piece and the command that fixes it.
+- "Access is denied", "being used by another process": close File Explorer windows inside the folder and any running copy of the game, pause the antivirus
+  or exclude the folder, and make sure the folder is not under Program Files.
+- "The drive ran out of space": the build needs about 15 GB free.
+- A path-too-long error: move the project to a short path such as `C:\Super3DXPlus`.
+- A download failed: check the internet connection, a firewall, a VPN or a proxy; the message gives the file's address so you can fetch it by hand.
+- "GENERATION STOPPED": the tools could not read the game's `main`. Check that the version is one of those in `docs/BUILDS.md` and that the copy is complete.
+- A conversion step failed: `python tools/pipeline.py convert <game folder> --only <step>` re-runs just that step once the cause is fixed.
+
+## The pieces
 
 Everything is driven by `build.py` (the player) and `tools/pipeline.py` (the data); both are plain Python 3.9+, the same on Windows,
 Linux and macOS. `python build.py doctor` shows what is installed and what is missing, with the command to get it.
