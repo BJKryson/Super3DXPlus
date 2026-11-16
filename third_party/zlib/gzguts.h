@@ -30,6 +30,11 @@
 #endif
 #include <fcntl.h>
 
+/* read, write, close and lseek: GCC 14 makes an implicit declaration an error (upstream zlib added this too) */
+#if !defined(_WIN32) && !defined(_MSC_VER) && !defined(__TURBOC__)
+#  include <unistd.h>
+#endif
+
 #ifdef _WIN32
 #  include <stddef.h>
 #endif
