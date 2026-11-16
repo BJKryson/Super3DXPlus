@@ -79,7 +79,7 @@ static const char *FS_GLOSS =
   "#if CUTOUT\n"
   "  if (c.a < 0.5) discard;\n"
   "#endif\n"
-  "  gl_FragColor = vec4(mix(uFogColor, c.rgb * uGrade, vFog), c.a);\n"
+  "  gl_FragColor = vec4(mix(uFogColor, c.rgb * uGrade, vFog), min(c.a, 1.0));\n"
   "}\n";
 
 /* ---- the look file: the cars' tuning (render.h render_look) ---- */

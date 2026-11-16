@@ -12,15 +12,15 @@ void main() {
 }
 
 //----FS
-#define TEXB(s, uv) texture2D(s, uv, -1.000)
+#define TEXB(s, uv) texture2D(s, uv, uLod)
 #define CUTOUT 0
 precision mediump float;
-uniform sampler2D uTex, uGloss; uniform samplerCube uCube; uniform lowp vec3 uFogColor, uGrade;
+uniform sampler2D uTex, uGloss; uniform samplerCube uCube; uniform lowp vec3 uFogColor, uGrade; uniform mediump float uLod;
 varying vec2 vUV; varying lowp vec4 vColor; varying lowp float vFog; varying vec3 vRefl;
 void main() {
   lowp vec4 c = TEXB(uTex, vUV) * vColor + texture2D(uGloss, vUV) * vec4(textureCube(uCube, vRefl).rgb, 1.0);
 #if CUTOUT
   if (c.a < 0.5) discard;
 #endif
-  gl_FragColor = vec4(mix(uFogColor, c.rgb * uGrade, vFog), c.a);
+  gl_FragColor = vec4(mix(uFogColor, c.rgb * uGrade, vFog), min(c.a, 1.0));
 }
