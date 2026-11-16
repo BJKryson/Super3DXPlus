@@ -15,6 +15,7 @@ This repository does **NOT** contain any copyrighted content from the original g
 *Wangan Midnight Maximum Tune* is a trademark of Bandai Namco Entertainment, Inc. This is an UNOFFICIAL, strictly NON-COMMERCIAL fan project and is not affiliated with them in any way, shape or form, written or implied.
 
 **Where can I get the APK / EXE?** 
+
 You can't. Any pre-built binaries you see online are unauthorized distributions of copyrighted content, and are not affiliated with this project or its developers. Running unsigned executables from strangers is a bad idea anyway. 
 
 ## Quick start
@@ -62,6 +63,12 @@ third_party/    stb, zlib, Khronos GLES2 headers (each with its own notice)
 docs/           building, testing, Pi, versus, input, builds, architecture
 ```
 
+## NOTE - Wheel / FFB support
+
+Basic FFB/wheel support is currently implemented, but in an experimental state, as I don't have the hardware to actually test it.
+If you get the game running and use a wheel, please let me know how your experience goes in this issue tracker:
+https://github.com/smolderyguest/Super3DXPlus/issues/2
+
 ## What makes this "native"?
 
 This is not an emulator wrapper. The arcade's car physics are statically recompiled from the game's own executable, and everything else (rendering, menus, sound, netcode) is a ground-up reconstruction. The game code runs on bare metal and "just works" without emulator setup, and most of the work goes into quality-of-life improvements for all sorts of control schemes.
@@ -98,9 +105,9 @@ Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and v
 
 - **Not implemented:** ghost VS battle, the post-race mileage screen, the 10 Outrun post-race rewards / progress screen.
 - **Known bugs:** menu slide/select animations aren't smooth; story rival headlight flare positions are inaccurate (no position data seems to be stored for them); gamepad detection for vibration is a little finicky (basic SDL2 compatibility).
-- **Limitations:** no racing wheel or force feedback support, and classic iOS support was dropped (no equipment to test either).
+- **Limitations:** classic iOS support was dropped (no equipment to test either).
 - **Cautions:** story mode hasn't been played all the way through. The Japan build is tested much less than Export, since I can't read Japanese; if the text is messed up, please submit an issue. The Pi and Android setup scripts (`setup-pi`, `setup-android`) are new: the Android script has built a valid app on Windows and Linux, but that app has not yet been run on a phone, and the Pi script has not yet been run start to finish on real hardware. If either fails, please open an issue with its log.
-- **Maybe later:** rollback netcode for online versus (big undertaking, noticeable performance cost), wheel support.
+- **Maybe later:** rollback netcode for online versus (big undertaking, noticeable performance cost).
 
 
 
