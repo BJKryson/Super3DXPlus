@@ -32,6 +32,8 @@ What Super3DX+ adds or changes compared with [Re3DX+](NOTICE.md). Longer explana
 - Fixed many missing animations (rival markers, etc.)
 - Restored original reflection handling, applied to rival cars
 - Tire smoke, headlight flares and the missing shift light
+- Fixed the reflective buildings of the morning Tokyo maps drawing over nearer objects (their reflection program and the plain one rounded the same vertex position differently, so surfaces at nearly the same depth swapped places); the vertex position is now declared invariant
+- Exhaust flames follow the tuned exhaust's pipes (the Savanna RX-7's single tuned pipe, and other cars)
 - Arcade-style race HUD alongside the touch HUD, with a debug options menu
 - Texture sharpness and graphics options (HD textures, wet road, paint reflections, anti-aliasing)
 - Minimaps for Osaka, Hakone, Nagoya and Fukuoka

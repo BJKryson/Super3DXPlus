@@ -1468,6 +1468,12 @@ void car_update(car_state *c, const car_input *in) {
     W32(pilot + 4, M32(RCA(9802928)));
     call(f_89bcca8, 2, pilot, P.m);
     WF(P.gin, -MF(pilot + 0x14));
+    if (getenv("WMMT_PILOT_LOG")) { /* test: what the pilot reads and answers, every 2 s */
+      static int n;
+      if (++n % 120 == 1)
+        fprintf(stderr, "pilot: in %g %g, out +0x10 %g +0x14 %g +0x18 %g +0x1c %g\n", MF(pilot), MF(pilot + 4), MF(pilot + 0x10), MF(pilot + 0x14), MF(pilot + 0x18), MF(pilot + 0x1c));
+    }
+    if (getenv("WMMT_PILOT_BIAS")) WF(P.gin, MF(P.gin) + (float)atof(getenv("WMMT_PILOT_BIAS"))); /* test: a steady steering offset, to hug a lane */
   }
 #endif
   WF(P.gin + 4, in->throttle);
