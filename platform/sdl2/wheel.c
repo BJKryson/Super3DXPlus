@@ -113,15 +113,19 @@ static void open_wheel(int list_i) {
   /* where every axis rests now (a pedal that is not moved sends nothing: the bindings must not take it for the middle of its throw) */
   const int na = SDL_JoystickNumAxes(W.j);
   for (int a = 0; a < na && a < AXIS_WHEELS; ++a) W.sink.axis(AXIS_W0 + a, SDL_JoystickGetAxis(W.j, a));
-  char info[80];
+  char info[160];
   snprintf(info, sizeof info, "%d AXES, %d BUTTONS", na, SDL_JoystickNumButtons(W.j));
+  fprintf(stderr, "wheel: opened %s (%s)\n", W.name, info);
   if (SDL_JoystickIsHaptic(W.j) <= 0) {
     say("%s; NO FORCE FEEDBACK ON IT", info, 0, 0);
+    fprintf(stderr, "wheel: SDL_JoystickIsHaptic: no (%s)\n", SDL_GetError());
     return;
   }
   W.h = SDL_HapticOpenFromJoystick(W.j);
   if (!W.h) {
-    snprintf(info + strlen(info), sizeof info - strlen(info), "; FORCES NOT AVAILABLE");
+    char err[64];
+    snprintf(err, sizeof err, "%s", SDL_GetError()); /* (what SDL says, on the screen: the one thing a report needs) */
+    snprintf(info + strlen(info), sizeof info - strlen(info), "; FORCES NOT AVAILABLE (%s)", err);
     say("%s", info, 0, 0);
     fprintf(stderr, "wheel: SDL_HapticOpenFromJoystick: %s\n", SDL_GetError());
     return;

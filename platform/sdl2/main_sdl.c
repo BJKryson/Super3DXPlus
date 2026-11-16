@@ -920,6 +920,11 @@ int main(int argc, char **argv) {
   /* Windows scales a program that does not say it knows about the screen's scaling (150 %, 200 %): the window's pixels are stretched, which is what
    * made the fullscreen picture blocky. Per-monitor awareness hands the game the real pixels (the window's size and the drawing are in them). */
   SDL_SetHint("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2");
+  /* A racing wheel's forces only go through DirectInput. SDL's RawInput and Windows.Gaming.Input drivers (on by default) take such a wheel first
+   * and have no forces: the wheel is listed, but "forces not available" (a Fanatec on the maker's driver). Off, a wheel comes through DirectInput
+   * and an Xbox pad still through XInput. Default priority: the same names in the environment (SDL_JOYSTICK_RAWINPUT=1) still win. */
+  SDL_SetHintWithPriority("SDL_JOYSTICK_RAWINPUT", "0", SDL_HINT_DEFAULT);
+  SDL_SetHintWithPriority("SDL_JOYSTICK_WGI", "0", SDL_HINT_DEFAULT);
 #endif
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) != 0) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
