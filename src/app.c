@@ -3067,6 +3067,14 @@ static void mini_draw(void *ctx, float fade) {
 static float fade_grey(int fade) { return fade == 2 ? 1.0f : 0.0f; }
 static void story_cut_start(void);
 
+/* whether a car of this tune shows the tuned exhaust (tuned_parts' muffler) */
+static int tuned_muffler(int pack, int power, int handling) {
+  render_params t;
+  memset(&t, 0, sizeof t);
+  tuned_parts(pack, power, handling, &t);
+  return t.muffler != 0;
+}
+
 /* the cars' sparks and tyre marks for a new race (the marks' tread: about the arcade's tyres') */
 #define TYRE_TREAD 2.2f
 static void effects_reset(void) {
@@ -3075,9 +3083,13 @@ static void effects_reset(void) {
   for (int k = 0; k < SPARK_CARS; ++k) spark_tyre(k, G.car.tyre_radius[k], TYRE_TREAD);
   /* the backfire's exhausts: the player's car as it is dressed, the rivals' by their pack (a
    * versus' other cars in their own aero) */
-  spark_backfire_car(0, G.race_pack, G.menu.aero[G.menu.maker][menu_slot(&G.menu)]);
+  /* (a tuned exhaust is a different set of pipes with fires of their own: the Savanna's is one pipe, not two) */
+  int pw, hd;
+  menu_tune(&G.menu, &pw, &hd);
+  spark_backfire_car(0, G.race_pack, G.menu.aero[G.menu.maker][menu_slot(&G.menu)], tuned_muffler(G.race_pack, pw, hd));
   for (int i = 0; i < CAR_RIVALS; ++i)
-    spark_backfire_car(1 + i, i < G.n_rival ? G.rival_pack[i] : -1, G.vs_race ? G.rival_dress[i].aero : 0);
+    spark_backfire_car(1 + i, i < G.n_rival ? G.rival_pack[i] : -1, G.vs_race ? G.rival_dress[i].aero : 0,
+                       G.vs_race && i < G.n_rival ? tuned_muffler(G.rival_pack[i], G.rival_tune[i][0], G.rival_tune[i][1]) : 0);
 }
 
 static void movie_open(int select, int race, const int *rows, int n_rows) {

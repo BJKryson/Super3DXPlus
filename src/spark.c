@@ -109,11 +109,12 @@ void spark_reset(void) {
   }
 }
 
-void spark_backfire_car(int k, int pack, int body) {
+void spark_backfire_car(int k, int pack, int body, int tuned_exhaust) {
   if (k < 0 || k >= SPARK_CARS) return;
   int n = (int)(sizeof BACKFIRE_CAR / sizeof BACKFIRE_CAR[0]);
-  S.bf_car[k] = pack >= 0 && pack < n ? &BACKFIRE_CAR[pack][body & 3] : NULL;
+  S.bf_car[k] = pack >= 0 && pack < n ? &BACKFIRE_CAR[pack][(tuned_exhaust ? 4 : 0) + (body & 3)] : NULL;
   for (int i = 0; i < 4; ++i) S.bf[k][i].state = -1;
+  if (getenv("MT3DX_FXLOG") && S.bf_car[k]) fprintf(stderr, "backfire car %d: pack %d, body %d, tuned exhaust %d: %d pipes\n", k, pack, body & 3, tuned_exhaust != 0, S.bf_car[k]->n);
 }
 
 static void backfire_step(int k, const float *body, const car_effect *e) {

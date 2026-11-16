@@ -24,9 +24,9 @@ void spark_draw_tracks(const mat4 *proj, const mat4 *view, render_params *rp);
 /* The tyre smoke of a sliding car (laid in spark_step) */
 void spark_draw_smoke(const mat4 *proj, const mat4 *view, render_params *rp);
 /* The cars' backfire (clBackFireManager, started and run in spark_step): car k's model (its
- * CARDB_PACKS pack, -1 none, and body 0 stock, 1..3 aero A..C) for its exhausts; and the fires
+ * CARDB_PACKS pack, -1 none, body 0 stock, 1..3 aero A..C, and whether it has the tuned exhaust) for its exhausts; and the fires
  * drawn, as the sparks */
-void spark_backfire_car(int k, int pack, int body);
+void spark_backfire_car(int k, int pack, int body, int tuned_exhaust);
 void spark_draw_backfire(const mat4 *proj, const mat4 *view, render_params *rp);
 /* The route console's walls at a junction (clCourseJunctionManager): none up (a new race), one arcade frame of them from the race's junction state (on: a versus racing), and drawn, as the sparks */
 void junction_reset(void);

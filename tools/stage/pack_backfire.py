@@ -115,31 +115,44 @@ def effect(root):
 
 
 def nulls(root, pack):
-    """per body: the MF_NULLs' positions (the body model's space), from the model's own scene"""
-    out = []
+    """per muffler (0 stock, 1 tuned) and body: the MF_NULLs' positions (the body model's space), from the model's own scene.
+
+    The tail pipes' nulls hang under the body's MUFFLER1 group (the stock exhaust) or MUFFLER2 (the tuned one, which can have a different
+    number of pipes: the Savanna RX-7's tuned exhaust is a single pipe), and the car shows one of the two, so the fires are the nulls
+    outside both groups and under the one that is shown. A car with no nulls of its own under MUFFLER2 keeps the stock ones."""
+    per = {0: [], 1: []}
     for body in BODIES:
         p = os.path.join(root, "data", "car", pack, body, "body.igb")
-        found = []
+        found = []  # (null index, position, under MUFFLER1, under MUFFLER2)
         if os.path.exists(p):
             f = IGB(p)
 
-            def walk(node, mat):
+            def walk(node, mat, m1, m2):
                 if node is None or node.mem is not None:
                     return
+                n = name(f, node)
+                m1, m2 = m1 or n == "MUFFLER1", m2 or n == "MUFFLER2"
                 if node.type == "igTransform" and node[8] is not None:
                     mat = np.frombuffer(node[8].raw, "<f4").reshape(4, 4).astype(np.float64) @ mat
-                    if name(f, node) in NULLS:
-                        found.append((NULLS.index(name(f, node)), mat[3, :3]))
+                    if n in NULLS:
+                        found.append((NULLS.index(n), mat[3, :3], m1, m2))
                 for child in scene.obj_list(f, f.ref(node[7])):
-                    walk(child, mat)
+                    walk(child, mat, m1, m2)
 
             for info in f.of_type("igSceneInfo"):
-                walk(f.ref(info[5]), np.eye(4))
+                walk(f.ref(info[5]), np.eye(4), False, False)
         found.sort(key=lambda x: x[0])
-        out.append([q for _, q in found][:4])
-    if not out[0]:
-        out[0] = next((b for b in out if b), [])
-    return [b if b else out[0] for b in out]
+        stock = [q for _, q, m1, m2 in found if not m2][:4]
+        tuned = [q for _, q, m1, m2 in found if not m1][:4]
+        if not any(m2 for _, _, _, m2 in found):
+            tuned = stock
+        per[0].append(stock)
+        per[1].append(tuned)
+    out = []
+    for v in (0, 1):
+        first = next((b for b in per[v] if b), [])
+        out += [b if b else per[v][0] or first for b in per[v]]
+    return out  # (muffler * 4 + body)
 
 
 def cf(v):
@@ -176,10 +189,10 @@ def main():
         L.append("  { %s }," % ", ".join("{ %d, %d }" % r for r in row))
     L.append("};")
     L.append("")
-    L.append("/* by CARDB_PACKS and body (0 stock, 1..3 aero A..C): its MF_NULL_R1 R2 L1 L2 there are (n),")
-    L.append(" * their positions in the car's space; b: the B fires (emCarID 0x2a, 0x2b, 0x34) */")
+    L.append("/* by CARDB_PACKS and muffler * 4 + body (muffler 0 stock, 1 tuned; body 0 stock, 1..3 aero A..C): its MF_NULL_R1 R2 L1 L2 there")
+    L.append(" * are (n), their positions in the car's space; b: the B fires (emCarID 0x2a, 0x2b, 0x34) */")
     L.append("typedef struct { unsigned char n, b; float at[4][3]; } backfire_car;")
-    L.append("static const backfire_car BACKFIRE_CAR[%d][4] = {" % len(packs))
+    L.append("static const backfire_car BACKFIRE_CAR[%d][8] = {" % len(packs))
     for p in packs:
         car = cars.get(p.lower())
         b = int(car in B_CARS) if car is not None else 0
