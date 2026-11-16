@@ -14,6 +14,7 @@
 #include "gl.h"
 #include "hud.h"
 #include "bind.h"
+#include "ffb.h"
 #include "storypre.h"
 #include "storysel.h"
 #include "storybgm.h"
@@ -2311,8 +2312,7 @@ static int optl_step(menu_state *m, const orow *rows, int n, int *sel, const men
   if (in->ok) {
     if (IS_SUB(r)) return 1;
     if (r->kind == OK_MIP) m->mip = (m->mip + 1) % 4, m->garage_changed = 1, snd_menu(SND_CURSOR);
-    else if (r->kind == OK_PCT) *r->v = (*r->v + 1) % 11, m->garage_changed = 1, snd_menu(SND_CURSOR);
-    else optl_chip_set(m, r, IS_RES(r) ? !*r->v : (*r->v ? 1 : 0));
+    else if (r->kind == OK_PCT) *r->v = (*r->v + 1) % 11, m->garage_changed = 1, snd_menu(SND_CURSOR);    else optl_chip_set(m, r, IS_RES(r) ? !*r->v : (*r->v ? 1 : 0));
   }
   return 0;
 }
@@ -2616,12 +2616,31 @@ static void draw_volume(const menu_state *m, int clock, int bars, float screen_w
 #define BIND_Y_ROW 128.0f
 #define BIND_ROW_DY 23.0f
 #define BIND_Y_TAB 90.0f
-static const char *const BIND_TAB[BIND_CONTEXTS + 1] = { "MENUS", "RACE", "AXES" }; /* (the third list is the analog axes: BA_*) */
+/* the lists: the menus' and the race's keys, the analog axes (BA_*), and a steering wheel's force feedback (ffb.h; no bindings, its own rows) */
+#define BIND_FFB (BIND_CONTEXTS + 1)
+#define BIND_TABS (BIND_CONTEXTS + 2)
+static const char *const BIND_TAB[BIND_TABS] = { "MENUS", "RACE", "AXES", "WHEEL" };
+/* the wheel list's rows: the device, the two switches, the four strengths (tenths), the test; the settings' ids, and the names */
+enum { FR_DEVICE, FR_ON, FR_INVERT, FR_OVERALL, FR_STEER, FR_CENTER, FR_DAMP, FR_ROAD, FR_TEST, FR_COUNT };
+static const signed char FR_ID[FR_COUNT] = { FFB_DEVICE, FFB_ON, FFB_INVERT, FFB_OVERALL, FFB_STEER, FFB_CENTER, FFB_DAMP, FFB_ROAD, -1 };
+static const char *const FR_NAME[FR_COUNT] = { "DEVICE", "FORCE FEEDBACK", "INVERT FORCE", "OVERALL", "STEERING FORCE", "CENTERING", "DAMPING", "ROAD EFFECTS", "TEST" };
+static const char *const FR_NOTE[FR_COUNT] = {
+  "THE STEERING WHEEL: LEFT AND RIGHT CHOOSE. STEERING AND PEDALS ARE SET ON THE AXES LIST",
+  "THE WHEEL'S MOTOR ON OR OFF",
+  "SWITCH IT IF THE WHEEL PULLS AWAY FROM STRAIGHT AHEAD INSTEAD OF TOWARDS IT",
+  "THE DEVICE'S GAIN: ALL THE FORCES AT ONCE",
+  "THE PULL OF THE FRONT TYRES; IT GOES LIGHT AT THE LIMIT AND FOLLOWS A SLIDE",
+  "A SPRING TO STRAIGHT AHEAD THAT GROWS WITH SPEED",
+  "RESISTANCE TO FAST TURNS OF THE WHEEL, FOR STEADINESS",
+  "THE SHAKE OF EXPANSION JOINTS, WALL HITS AND SLIDING TYRES",
+  "A SWEEP FROM SIDE TO SIDE, THEN A SHAKE: HOLD THE WHEEL LOOSELY"
+};
+#define FR_CELL_W 330.0f /* the value cell's width (it starts at the axes list's first cell) */
 /* the RACE list has one row that is no action, under STEER LEFT / RIGHT: BUTTON STEERING SPEED (RS_ROW); the rows past it are the actions one on */
 #define RS_ROW 2
 static int bind_act(int ctx, int row) { return ctx == BIND_RACE && row > RS_ROW ? row - 1 : row; }
 static int bind_is_speed(int ctx, int row) { return ctx == BIND_RACE && row == RS_ROW; }
-static int bind_rows(int ctx) { return ctx == BIND_CONTEXTS ? BA_COUNT + 3 : ctx == BIND_RACE ? bind_actions(ctx) + 1 : bind_actions(ctx); } /* (the AXES list: the axes, then the steering filter's switch and its two numbers) */
+static int bind_rows(int ctx) { return ctx == BIND_FFB ? FR_COUNT : ctx == BIND_CONTEXTS ? BA_COUNT + 3 : ctx == BIND_RACE ? bind_actions(ctx) + 1 : bind_actions(ctx); } /* (the AXES list: the axes, then the steering filter's switch and its two numbers) */
 /* the filter's number of a row of the AXES list past the switch (half steps, 0..20) */
 static int *filter_value(menu_state *m, int row) {
   return row == BA_COUNT + 1 ? &m->filter_smooth : row == BA_COUNT + 2 ? &m->filter_counter : &m->btn_steer; /* (+3: the buttons' steering speed, 1..10, whole steps) */
@@ -2653,7 +2672,10 @@ static void bindings_enter(menu_state *m) {
 static void bindings_note(menu_state *m, const char *s) { snprintf(m->bind_note, sizeof m->bind_note, "%s", s); }
 /* the wait for an input ends by itself after this long (a pad has no Escape: it must never be left waiting) */
 #define BIND_WAIT_FRAMES (8 * 60)
-static void bind_wait_on(menu_state *m) { m->bind_wait = 1, m->bind_wait_t = 0; }
+static void bind_wait_on(menu_state *m) {
+  m->bind_wait = 1, m->bind_wait_t = 0;
+  memcpy(m->axis_base, m->axis_raw, sizeof m->axis_base);
+}
 static void bind_wait_off(menu_state *m, const char *note) {
   m->bind_wait = 0;
   bindings_note(m, note);
@@ -2670,6 +2692,7 @@ int menu_bind_wants(const menu_state *m, int kind, int code) {
 void menu_bind_capture(menu_state *m, int kind, int code) {
   if (m->screen != MENU_BINDINGS) return;
   int ctx = m->bind_ctx, row = m->bind_row, slot = m->bind_col;
+  if (ctx == BIND_FFB) return; /* (the wheel list binds nothing) */
   if (ctx == BIND_CONTEXTS) { /* the axes' list: Esc cancels, Delete takes the axis away, a key is no axis */
     if (kind == BIND_KEY && code == BK_ESCAPE && m->bind_wait) {
       m->bind_wait = 0;
@@ -2681,7 +2704,7 @@ void menu_bind_capture(menu_state *m, int kind, int code) {
       m->bind_wait = 0;
       m->garage_changed = 1;
       snd_menu(SND_CANCEL);
-    } else if (m->bind_wait && !(kind == BIND_PAD && (code == BP_RT || code == BP_LT || code >= BP_STICK_LEFT))) {
+    } else if (m->bind_wait && !(kind == BIND_PAD && (code == BP_RT || code == BP_LT || (code >= BP_STICK_LEFT && code < BP_W0)))) {
       bind_wait_off(m, "THAT CELL TAKES A STICK OR A TRIGGER"); /* (a button or a key: the wait ends; a trigger or the stick come as the axis) */
     }
     return;
@@ -2726,7 +2749,9 @@ void menu_bind_capture(menu_state *m, int kind, int code) {
 /* an axis moved: the wait for an axis takes one pushed past 60 % */
 int menu_axis_capture(menu_state *m, int axis, float v) {
   if (m->screen != MENU_BINDINGS || !m->bind_wait || m->bind_ctx != BIND_CONTEXTS || m->bind_col != 0 || m->bind_row >= BA_COUNT) return 0;
-  if (v < 0.6f && v > -0.6f) return 0;
+  if (axis >= AXIS_W0) { /* a wheel's axis: moved far from where it rested (a pedal rests at an end), not far from the middle */
+    if (fabsf(v - m->axis_base[axis]) < 0.5f) return 0;
+  } else if (v < 0.6f && v > -0.6f) return 0;
   const bind_axis *a = bind_axis_get(m->bind_row);
   bind_axis_set(m->bind_row, axis, a->invert, a->dead);
   m->bind_wait = 0;
@@ -2873,6 +2898,38 @@ static void draw_touchctl(const menu_state *m, float screen_w, float screen_h) {
   }
 }
 
+/* a row of the wheel list changed: by (-1, +1) with left and right, or OK (wrap: the strengths go round past 100 %) */
+static void wheel_change(menu_state *m, int row, int by, int ok) {
+  if (row == FR_TEST) {
+    if (ffb_device_count() && *ffb_val(FFB_DEVICE) > 0 && *ffb_val(FFB_ON)) {
+      ffb_test();
+      snd_menu(SND_SELECT);
+      bindings_note(m, "TESTING...");
+    } else {
+      snd_menu(SND_CANCEL);
+      bindings_note(m, "CHOOSE A DEVICE AND SWITCH FORCE FEEDBACK ON FIRST");
+    }
+    return;
+  }
+  int *v = ffb_val(FR_ID[row]);
+  if (row == FR_DEVICE) {
+    int count = ffb_device_count() + 1, to = (*v + by + count) % count;
+    if (to != *v) *v = to, m->garage_changed = 1, snd_menu(SND_CURSOR);
+    return;
+  }
+  if (row == FR_ON || row == FR_INVERT) {
+    *v = !*v;
+  } else {
+    int to = *v + by;
+    if (to > 10) to = ok ? 0 : 10;
+    if (to < 0) to = 0;
+    if (to == *v) return;
+    *v = to;
+  }
+  m->garage_changed = 1;
+  snd_menu(SND_CURSOR);
+}
+
 static void bindings_step(menu_state *m, const menu_in *in) {
   if (bind_touch(m) && !m->bind_wait) {
     if (in->back) {
@@ -2904,7 +2961,7 @@ static void bindings_step(menu_state *m, const menu_in *in) {
     option_enter(m);
     return;
   }
-  if (in->tab >= 0 && in->tab <= BIND_CONTEXTS) {
+  if (in->tab >= 0 && in->tab < BIND_TABS) {
     if (in->tab != m->bind_ctx) snd_menu(SND_CURSOR);
     m->bind_ctx = in->tab, m->bind_row = 0, m->bind_wait = 0;
     bindings_note(m, "");
@@ -2918,13 +2975,26 @@ static void bindings_step(menu_state *m, const menu_in *in) {
   }
   if (in->view) {
     snd_menu(SND_CURSOR);
-    m->bind_ctx = (m->bind_ctx + 1) % (BIND_CONTEXTS + 1), m->bind_row = 0, m->bind_col = 0;
+    m->bind_ctx = (m->bind_ctx + 1) % BIND_TABS, m->bind_row = 0, m->bind_col = 0;
     bindings_note(m, "");
     return;
   }
   if (in->dy) {
     int r = m->bind_row + in->dy;
     if (r >= 0 && r <= n) snd_menu(SND_CURSOR), m->bind_row = r;
+    return;
+  }
+  if (m->bind_ctx == BIND_FFB) { /* the wheel list: left and right change the value, OK steps it on (the last row puts the defaults back) */
+    if (m->bind_row >= n) {
+      if (in->ok) {
+        ffb_defaults();
+        m->garage_changed = 1;
+        bindings_note(m, "DEFAULTS BACK");
+        snd_menu(SND_SELECT);
+      }
+    } else if (in->dx || in->ok) {
+      wheel_change(m, m->bind_row, in->dx ? in->dx : 1, in->ok);
+    }
     return;
   }
   if (in->dx && m->bind_ctx == BIND_CONTEXTS && m->bind_row == BA_COUNT) { /* the steering filter's row: left or right flips it */
@@ -3021,11 +3091,47 @@ static void draw_bindings(const menu_state *m, int clock, int bars, float screen
     return;
   }
   if (!tb) hud_ui_text("KEY BINDINGS", 24.0f * k, 40.0f * k, 4.0f, 1, 1, 1, 1);
-  for (int c = 0; c <= BIND_CONTEXTS; ++c) { /* the lists */
+  for (int c = 0; c < BIND_TABS; ++c) { /* the lists */
     float x = BIND_X_NAME + 96.0f * (float)c, w = 90.0f;
     hud_ui_rect(x * k, BIND_Y_TAB * k, w * k, 20.0f * k, c == ctx ? 1.0f : 0.0f, c == ctx ? 0.42f : 0.0f, c == ctx ? 0.05f : 0.0f,
                 c == ctx ? 0.9f : 0.45f);
     hud_ui_text(BIND_TAB[c], (x + 0.5f * w) * k - 0.5f * hud_ui_text_width(BIND_TAB[c], 2.2f), (BIND_Y_TAB + 3.0f) * k, 2.2f, 1, 1, 1, 1);
+  }
+  if (ctx == BIND_FFB) { /* the wheel: the device, the switches, the strengths as bars, the test */
+    for (int r = 0; r <= n; ++r) {
+      float y = BIND_Y_ROW + BIND_ROW_DY * (float)r;
+      int row_on = r == m->bind_row;
+      hud_ui_rect(0, y * k, 640.0f * k, (BIND_ROW_DY - 2.0f) * k, 0, 0, 0, r & 1 ? 0.25f : 0.38f);
+      if (row_on) hud_ui_rect(2.0f * k, y * k, 4.0f * k, (BIND_ROW_DY - 2.0f) * k, 1.0f, 0.42f, 0.05f, 1.0f);
+      if (r == n) {
+        hud_ui_text("RESET TO DEFAULT", BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, row_on ? 1.0f : 0.8f, row_on ? 0.55f : 0.8f, row_on ? 0.15f : 0.8f, 1);
+        continue;
+      }
+      hud_ui_text(FR_NAME[r], BIND_X_NAME * k, (y + 5.0f) * k, 2.0f, 1, 1, 1, 1);
+      const float cx = AX_X[0], cw = FR_CELL_W;
+      hud_ui_rect(cx * k, (y + 1.0f) * k, cw * k, (BIND_ROW_DY - 4.0f) * k, row_on ? 0.35f : 0.0f, row_on ? 0.15f : 0.0f, 0.0f, row_on ? 0.85f : 0.4f);
+      if (row_on) hud_ui_rect(cx * k, (y + 1.0f) * k, cw * k, 2.0f, 1.0f, 0.42f, 0.05f, 1.0f);
+      const int v = r == FR_TEST ? 0 : *ffb_val(FR_ID[r]);
+      char txt[160];
+      if (r == FR_DEVICE) snprintf(txt, sizeof txt, "< %s >", v > 0 ? ffb_device_name(v - 1) : ffb_device_count() ? "NONE" : "NONE FOUND");
+      else if (r == FR_ON || r == FR_INVERT) snprintf(txt, sizeof txt, "%s", v ? "ON" : "OFF");
+      else if (r == FR_TEST) snprintf(txt, sizeof txt, "PLAY");
+      else {
+        snprintf(txt, sizeof txt, "< %d %% >", v * 10);
+        hud_ui_rect(cx * k, (y + BIND_ROW_DY - 6.0f) * k, cw * ((float)v / 10.0f) * k, 3.0f, 1.0f, 0.42f, 0.05f, 0.9f); /* (the strength under the number) */
+      }
+      float px = 1.9f;
+      while (px > 1.2f && hud_ui_text_width(txt, px) > (cw - 8.0f) * k) px -= 0.1f;
+      hud_ui_text(txt, (cx + 0.5f * cw) * k - 0.5f * hud_ui_text_width(txt, px), (y + 5.0f) * k, px, 1, 1, 1, v == 0 && r == FR_DEVICE ? 0.55f : 1.0f);
+    }
+    const char *dev = ffb_selected_name();
+    char line[240];
+    snprintf(line, sizeof line, "%s", m->bind_note[0] ? m->bind_note : m->bind_row < FR_COUNT ? FR_NOTE[m->bind_row] : "PRESS VIEW TO SWITCH CATEGORY");
+    hud_ui_text(line, 20.0f * k, 368.0f * k, 1.7f, 0.85f, 0.85f, 0.85f, 1);
+    snprintf(line, sizeof line, "%s%s%s", dev ? dev : ffb_device_count() ? "NO DEVICE CHOSEN" : "NO WHEEL OR CONTROLLER FOUND", dev && ffb_status()[0] ? ": " : "", dev ? ffb_status() : "");
+    hud_ui_text(line, 20.0f * k, 384.0f * k, 1.7f, 1.0f, 0.55f, 0.15f, 1);
+    hud_ui_end();
+    return;
   }
   if (ctx == BIND_CONTEXTS) { /* the analog axes: which axis, inverted, the dead zone, and what it gives now */
     static const char *const HEAD[5] = { "AXIS", "INVERT", "DEADZONE", "SENS.", "NOW" };
@@ -10416,7 +10522,7 @@ static int menu_pointer(const menu_state *m, menu_in *in) {
   }
   if (m->screen == MENU_BINDINGS) { /* a list tab, a cell (chosen and waited on), the defaults row */
     const float k = 1.0f;
-    for (int c = 0; c <= BIND_CONTEXTS; ++c) {
+    for (int c = 0; c < BIND_TABS; ++c) {
       float tx = BIND_X_NAME + 96.0f * (float)c;
       if (x >= tx && x < tx + 90.0f && y >= BIND_Y_TAB && y < BIND_Y_TAB + 20.0f) {
         in->tab = c;
@@ -10427,6 +10533,13 @@ static int menu_pointer(const menu_state *m, menu_in *in) {
     if (row < 0 || row > n) return 1;
     if (row == n) {
       in->select = row * BIND_SLOTS, in->ok = 1;
+      return 1;
+    }
+    if (m->bind_ctx == BIND_FFB) { /* the wheel list: the left third of the value cell steps down, the right third up, the middle decides */
+      in->select = row * BIND_SLOTS;
+      if (x >= AX_X[0] && x < AX_X[0] + FR_CELL_W / 3.0f) in->dx = -1;
+      else if (x >= AX_X[0] + FR_CELL_W * 2.0f / 3.0f && x < AX_X[0] + FR_CELL_W) in->dx = 1;
+      else if (x >= AX_X[0] && x < AX_X[0] + FR_CELL_W) in->ok = 1;
       return 1;
     }
     if (m->bind_ctx == BIND_CONTEXTS && row == BA_COUNT) {

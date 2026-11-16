@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 API = 28
 WIN = os.name == "nt"
 NATIVE_SRCS = ("platform/android/main_android.c platform/sdl2/bgm.c src/app.c src/render.c src/hud.c src/car.c src/collide.c src/sound.c src/anm.c "
-               "src/menu.c src/bind.c src/lights.c src/spark.c src/haptic.c src/net.c src/vs_host.c src/nat.c src/title.c src/phys/rc_runtime.c").split()
+               "src/menu.c src/bind.c src/lights.c src/spark.c src/haptic.c src/ffb.c src/net.c src/vs_host.c src/nat.c src/title.c src/phys/rc_runtime.c").split()
 STORE_PASS = "super3dxdebug"
 
 

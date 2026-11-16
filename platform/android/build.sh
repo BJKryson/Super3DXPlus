@@ -53,7 +53,7 @@ fi
 $CC -O2 -fPIC -shared -std=gnu99 -Wall -Wno-unused-function -DRC_FPT=double -DWMMT_EGL $GFX \
   -mcpu=cortex-a73 -Isrc -Iplatform/android -Iplatform/sdl2 -Ithird_party/stb \
   platform/android/main_android.c platform/sdl2/bgm.c src/app.c src/render.c src/hud.c src/car.c src/collide.c src/sound.c src/anm.c src/menu.c src/bind.c \
-  src/lights.c src/spark.c src/haptic.c src/net.c src/vs_host.c src/nat.c src/title.c \
+  src/lights.c src/spark.c src/haptic.c src/ffb.c src/net.c src/vs_host.c src/nat.c src/title.c \
   src/phys/rc_runtime.c "$OUT/obj/phys_rc.o" \
   -o "$OUT/apk/lib/arm64-v8a/libwmmt.so" \
   -landroid $GFX_LIBS -laaudio -llog -lz -lm -Wl,-z,max-page-size=16384

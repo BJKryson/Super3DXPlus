@@ -496,8 +496,8 @@ typedef struct {
    * and whether it waits for an input, and a note under the list. */
   int bind_ctx, bind_row, bind_col, bind_wait, bind_wait_t; /* bind_wait_t: the frames the wait has lasted (it gives up after 8 s) */
   char bind_note[72];
-  float axis_raw[6]; /* the pad's axes as they are (the binding screen's AXES list shows them live) */
-} menu_state;
+  float axis_raw[14]; /* the pad's and a wheel's axes as they are (bind.h AXIS_COUNT; the binding screen's AXES list shows them live) */
+  float axis_base[14]; /* the axes as they were when the wait for one began (a wheel's pedal rests at the end of its throw) */} menu_state;
 enum { MENU_VS_OFF, MENU_VS_CONNECTING, MENU_VS_LOBBY, MENU_VS_LOADING, MENU_VS_RACE };
 enum { MENU_VS_LAN, MENU_VS_NET, MENU_VS_KINDS };
 #define MENU_VS_RAMPS 22

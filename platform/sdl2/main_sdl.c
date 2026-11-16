@@ -33,6 +33,7 @@
 #include "menu.h" /* MENU_ACT_* */
 #include "movie.h"
 #include "sound.h"
+#include "wheel.h"
 
 #define LAYOUT_W 1024 /* the game's layout: 1024x768, which the framebuffer is here too */
 #define LAYOUT_H 768
@@ -547,6 +548,7 @@ static int game(void *arg) {
     app_frame(dt);
     P.fs_want = app_fullscreen();
     pad_rumble_frame();
+    wheel_frame(); /* (a wheel's forces, wheel.c) */
     /* the attract loop's movies (movie.c: data_dir/intro.wmv, playdemo.wmv, tutorial.wmv); one that is not there ends at once */
     int want = app_movie();
     if (want != movie) {
@@ -612,6 +614,7 @@ static int game(void *arg) {
     }
   }
   app_vs_leave(); /* (a versus left by closing the window: the others hear it at once) */
+  wheel_quit();   /* (no force left running on the wheel) */
   return 0;
 }
 
@@ -707,6 +710,47 @@ static void vpad_init(void) {
   fprintf(stderr, "virtual pad: %s (%d presses)\n", VPAD ? "attached" : SDL_GetError(), n_vp / 2);
 }
 
+/* MT3DX_VWHEEL="<s>:AX<n>=<v>;<s>:B<n>;...": a virtual steering wheel (a joystick no game controller layout knows: 6 axes, 12 buttons, the pedals' axes 1 and 2
+ * resting at -1) that sets axis n to v (-1..1) or presses button n (0 based) for 0.15 s at those seconds: the test of the wheel's path (wheel.c) without one.
+ * It has no force feedback; the device list and the raw axes and buttons are what it tests. */
+static SDL_Joystick *VWHEEL;
+static struct { double at; int axis, button, value, down, done; } VW[64];
+static int n_vw;
+
+static void vwheel_init(void) {
+  const char *s = getenv("MT3DX_VWHEEL");
+  if (!s) return;
+  for (; s && *s && n_vw < 60; s = strchr(s, ';') ? strchr(s, ';') + 1 : NULL) {
+    double at, v;
+    int n;
+    if (sscanf(s, "%lf:AX%d=%lf", &at, &n, &v) == 3) VW[n_vw].at = at, VW[n_vw].axis = n, VW[n_vw++].value = (int)(v * 32767.0);
+    else if (sscanf(s, "%lf:B%d", &at, &n) == 2) {
+      VW[n_vw].at = at, VW[n_vw].axis = -1, VW[n_vw].button = n, VW[n_vw++].down = 1;
+      VW[n_vw].at = at + 0.15, VW[n_vw].axis = -1, VW[n_vw].button = n, VW[n_vw++].down = 0;
+    }
+  }
+  SDL_VirtualJoystickDesc d;
+  SDL_zero(d);
+  d.version = SDL_VIRTUAL_JOYSTICK_DESC_VERSION;
+  d.type = SDL_JOYSTICK_TYPE_WHEEL;
+  d.naxes = 6;
+  d.nbuttons = 12;
+  d.name = "Virtual wheel";
+  int index = SDL_JoystickAttachVirtualEx(&d);
+  VWHEEL = index >= 0 ? SDL_JoystickOpen(index) : NULL;
+  if (VWHEEL) SDL_JoystickSetVirtualAxis(VWHEEL, 1, -32768), SDL_JoystickSetVirtualAxis(VWHEEL, 2, -32768);
+  fprintf(stderr, "virtual wheel: %s (%d steps)\n", VWHEEL ? "attached" : SDL_GetError(), n_vw);
+}
+
+static void vwheel_run(double t) {
+  for (int i = 0; VWHEEL && i < n_vw; ++i) {
+    if (VW[i].done || t < VW[i].at) continue;
+    VW[i].done = 1;
+    if (VW[i].axis >= 0) SDL_JoystickSetVirtualAxis(VWHEEL, VW[i].axis, VW[i].value);
+    else SDL_JoystickSetVirtualButton(VWHEEL, VW[i].button, VW[i].down);
+  }
+}
+
 static void vpad_run(double t) {
   for (int i = 0; VPAD && i < n_vp; ++i) {
     if (VP[i].done || t < VP[i].at) continue;
@@ -758,6 +802,16 @@ static void push_axis(int axis, int v) {
   SDL_LockMutex(P.mx);
   if (P.n_ev < EV_MAX) P.ev[P.n_ev++] = (input_ev){ 3, axis, v / 32767.0f, 0, 0, 0 };
   SDL_UnlockMutex(P.mx);
+}
+
+/* a steering wheel's axis and button (wheel.c): the same events the pad's make (the bindings say what they steer) */
+static void wheel_axis_sink(int axis, int v) {
+  if (getenv("MT3DX_LOG")) fprintf(stderr, "input: wheel axis %d %d\n", axis - AXIS_W0, v);
+  push_axis(axis, v);
+}
+static void wheel_button_sink(int code, int down) {
+  if (getenv("MT3DX_LOG")) fprintf(stderr, "input: wheel button %d %s\n", code, down ? "down" : "up");
+  pad_input(code, down);
 }
 
 static void pad_axis(int axis, int v) {
@@ -871,6 +925,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     return 1;
   }
+  if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) fprintf(stderr, "no force feedback (SDL haptic: %s)\n", SDL_GetError()); /* (a wheel still steers) */
+  {
+    static const wheel_sink sink = { wheel_axis_sink, wheel_button_sink };
+    wheel_init(&sink);
+  }
   P.mx = SDL_CreateMutex();
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -935,6 +994,7 @@ int main(int argc, char **argv) {
 
   bind_set_key_namer(key_name);
   vpad_init();
+  vwheel_init();
   const double vpad_t0 = now_s();
   int left_down = 0;
   const double quit_at = getenv("MT3DX_AUTOQUIT") ? now_s() + atof(getenv("MT3DX_AUTOQUIT")) : 0; /* tests: leave after n s */
@@ -950,6 +1010,7 @@ int main(int argc, char **argv) {
     }
     pad_repeat();
     vpad_run(now_s() - vpad_t0);
+    vwheel_run(now_s() - vpad_t0);
     /* tests: MT3DX_CLICK="<s>:<x>,<y>;..." clicks at those window pixels (the mouse path, for the window-to-layout mapping),
      * MT3DX_RESIZE="<s>:<w>x<h>;..." sizes the window then (the live resize) */
     {
@@ -1005,8 +1066,18 @@ int main(int argc, char **argv) {
     case SDL_CONTROLLERDEVICEADDED: pad_open(e.cdevice.which); break;
     case SDL_CONTROLLERDEVICEREMOVED: pad_close(e.cdevice.which); break;
     case SDL_CONTROLLERBUTTONDOWN:
-    case SDL_CONTROLLERBUTTONUP: pad_button(e.cbutton.button, e.type == SDL_CONTROLLERBUTTONDOWN); break;
-    case SDL_CONTROLLERAXISMOTION: pad_axis(e.caxis.axis, e.caxis.value); break;
+    case SDL_CONTROLLERBUTTONUP:
+      if (e.cbutton.which != wheel_instance()) pad_button(e.cbutton.button, e.type == SDL_CONTROLLERBUTTONDOWN); /* (the chosen wheel is read raw) */
+      break;
+    case SDL_CONTROLLERAXISMOTION:
+      if (e.caxis.which != wheel_instance()) pad_axis(e.caxis.axis, e.caxis.value);
+      break;
+    case SDL_JOYDEVICEADDED:
+    case SDL_JOYDEVICEREMOVED:
+    case SDL_JOYAXISMOTION:
+    case SDL_JOYBUTTONDOWN:
+    case SDL_JOYBUTTONUP:
+    case SDL_JOYHATMOTION: wheel_event(&e); break;
     case SDL_WINDOWEVENT:
       if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
         SDL_GetWindowSize(P.win, &P.win_w, &P.win_h);

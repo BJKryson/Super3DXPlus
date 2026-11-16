@@ -34,6 +34,7 @@
 #include "storyinfo.h"
 #include "gl.h"
 #include "haptic.h"
+#include "ffb.h"
 #include "hud.h"
 #include "lights.h"
 #include "spark.h"
@@ -1580,6 +1581,7 @@ int app_init(const char *data_dir, int fb_width, int fb_height, float screen_w, 
   snprintf(G.data_dir, sizeof G.data_dir, "%s", data_dir);
   if (!G.save_dir[0]) snprintf(G.save_dir, sizeof G.save_dir, "%s", data_dir);
   bind_load(G.save_dir); /* the keys and buttons (bind.h), the defaults without a file */
+  ffb_load(G.save_dir); /* the wheel's device and forces (ffb.h) */
   {
     char look[1100];
     snprintf(look, sizeof look, "%s/look.txt", G.save_dir); /* the cars' look, tuned in it (render.h render_look) */
@@ -1753,6 +1755,12 @@ void app_window_row(int on) { G.menu.win_row = on != 0; }
 void app_rumble(float *low, float *high) {
   *low = *high = 0.0f;
   if (G.car.race.play_state == 2 && G.car.race.countdown <= 0.0f && app_racing()) haptic_get(low, high);
+}
+
+/* the wheel's forces now (ffb.c): the race's, or the test's anywhere; nothing outside a running race (the pause, the menus, the countdown) */
+void app_ffb(ffb_out *o) {
+  if (!(G.car.race.play_state == 2 && G.car.race.countdown <= 0.0f && app_racing() && !G.paused)) ffb_step(&G.car, 0);
+  ffb_get(o);
 }
 
 /* the race's action of each bindable one (bind.h BR_*) */
@@ -4094,6 +4102,7 @@ static void menu_frame(float dt, double frame_start) {
     hq_apply();
     options_save();
     if (bind_dirty()) bind_save(G.save_dir);
+    if (ffb_dirty()) ffb_save(G.save_dir);
     garage_save();
     G.menu.garage_changed = 0;
   }
@@ -4794,6 +4803,7 @@ void app_frame(float dt) {
     car_update(&G.car, &in);
     haptic_set_levels(G.menu.rum);
     haptic_step(&G.car, G.car.race.play_state == 2 && G.car.race.countdown <= 0.0f && app_racing());
+    ffb_step(&G.car, G.car.race.play_state == 2 && G.car.race.countdown <= 0.0f && app_racing() && !G.paused);
     in.shift_up = in.shift_down = 0;
     vs_contact_log();
     /* clCarEffectManager::update's sparks, each car's */

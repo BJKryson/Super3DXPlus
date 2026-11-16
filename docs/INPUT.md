@@ -190,6 +190,49 @@ The pad's two rumble motors follow the player's car in a running race (nothing i
 GAME OPTIONS > VIBRATION has OVERALL, WALL HITS, EXPANSION JOINTS and TIRE SLIP, each in tenths (the defaults: overall 80 %, the slip 50 %, the others 100 %); they are saved as
 the `rumble4` line of `option`. The code is `src/haptic.c`; `MT3DX_FXLOG=1` logs its pulses.
 
+## Steering wheels and force feedback
+
+**Untested on real hardware** (the author has no wheel): the code is written against SDL's documented API and checked with a virtual wheel
+(`MT3DX_VWHEEL`) for the device list, raw axes, buttons and saved settings, but no force has been played on a motor yet. Reports from wheel
+owners are what it needs; see "Testing a wheel" below.
+
+**The arcade's own protocol is not used.** The cabinet's wheel is driven by its I/O board, which is not part of what was recompiled, so
+there is nothing to pass through. The forces are made from the player's car (`src/ffb.c`) and played through SDL's haptic API
+(`platform/sdl2/wheel.c`), which covers wheels that have a force feedback driver (DirectInput on Windows, evdev on Linux, so also the Pi).
+XInput-only devices and Android are not covered (Android keeps its pad rumble).
+
+**Using one.** Plug the wheel in before starting, then SETTINGS > CONTROLS > KEY BINDINGS > **WHEEL** (the fourth list; View switches lists):
+
+- **DEVICE**: left and right choose among the joysticks found (plain pads are left out; a device is listed even without force feedback,
+  it then only steers). The line under the list says what the device reports: its axes and buttons and which force types it can play.
+  The choice is saved by name, so it comes back when the wheel is plugged in again.
+- **FORCE FEEDBACK** (on / off), **INVERT FORCE** (switch it if the wheel pulls away from straight ahead; the direction convention of
+  drivers differs and could not be checked), **OVERALL** (the device's gain), **STEERING FORCE**, **CENTERING**, **DAMPING**, **ROAD EFFECTS**
+  (tenths, 0-100 %), **TEST** (a sweep from side to side and a shake, 2.5 s) and RESET TO DEFAULT.
+- Saved as `<save dir>/ffb`. Defaults are mild (overall 60 %).
+
+**Steering and pedals** come in as the wheel's raw joystick axes (the chosen wheel is read as a joystick, not as a game controller, because
+SDL has no layout for most wheels). They are bindable on the **AXES** list as WHEEL AXIS 1-8 (the first eight axes the device reports): OK
+on the AXIS cell, then turn the wheel or press the pedal (a pedal is taken when it moves far from where it rests). Use INVERT if a pedal
+reads the wrong way round. A wheel's pedal is read over its whole throw (rest to floor). Wheel buttons are bindable on the MENUS and RACE
+lists as WHEEL BTN 1-32 (PAD cells); the first hat is the D-pad. Set the wheel's rotation (e.g. 900 degrees) in its driver, and the
+steering response with the AXES list's dead zone and SENS. (and the steering filter).
+
+**The forces** (`ffb_step`), from the car's sim each arcade frame, all fading to nothing below walking speed:
+
+- steering force: against the car's lateral g (the pull towards straight ahead), lighter as the front tyres pass their grip, plus a pull
+  towards the way the car is going in a slide (counter-steer);
+- centering spring and damping, growing with speed;
+- road effects: the pad vibration's pulses (expansion joints, wall hits and scrapes, tyre slip; `haptic.c`) as one vibration of the wheel.
+  The VIBRATION settings (controller rumble) scale these too.
+
+All of it is a first guess at what feels right. The numbers to tune are at the top of `ffb_step`.
+
+**Testing a wheel.** `MT3DX_LOG=1` prints the wheel axes and buttons as they arrive, and the player prints one `wheel:` line with what it
+opened and which force types it created (stderr). If the wheel is listed but the line says no force feedback, the driver or OS permissions
+are the cause (on Linux the `/dev/input/event*` node must be writable by the player's user). Useful in a report: the wheel's model, OS, the
+`wheel:` line, which forces were felt, and whether INVERT FORCE was needed.
+
 ## Window mode (the PC player)
 
 GAME OPTIONS > WINDOW MODE switches between a window and borderless fullscreen; F11 or Alt+Enter does the same at any time. The choice is

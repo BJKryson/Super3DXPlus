@@ -141,14 +141,20 @@ void bind_axis_set_sens(int action, int sens) {
 }
 
 const char *bind_axis_name(int axis) {
-  static const char *const N[AXIS_COUNT] = { "LEFT STICK X", "LEFT STICK Y", "RIGHT STICK X", "RIGHT STICK Y", "LEFT TRIGGER", "RIGHT TRIGGER" };
-  return axis >= 0 && axis < AXIS_COUNT ? N[axis] : "--";
+  static const char *const N[AXIS_PAD] = { "LEFT STICK X", "LEFT STICK Y", "RIGHT STICK X", "RIGHT STICK Y", "LEFT TRIGGER", "RIGHT TRIGGER" };
+  static char w[AXIS_WHEELS][16];
+  if (axis >= AXIS_W0 && axis < AXIS_COUNT) {
+    snprintf(w[axis - AXIS_W0], sizeof w[0], "WHEEL AXIS %d", axis - AXIS_W0 + 1);
+    return w[axis - AXIS_W0];
+  }
+  return axis >= 0 && axis < AXIS_PAD ? N[axis] : "--";
 }
 
 float bind_axis_value(int action, const float raw[AXIS_COUNT]) {
   const bind_axis *a = &AX[action];
   if (a->axis < 0) return 0.0f;
   float v = raw[a->axis] * (a->invert ? -1.0f : 1.0f), d = (float)a->dead * 0.01f;
+  if (a->axis >= AXIS_W0 && action != BA_STEER) v = 0.5f * (v + 1.0f); /* a wheel's pedal: the whole throw, from one end (rest) to the other */
   float m = v < 0 ? -v : v;
   m = m <= d ? 0.0f : (m - d) / (1.0f - d);
   if (m > 1.0f) m = 1.0f;
@@ -175,10 +181,14 @@ const char *bind_name(const bind_slot *s) {
     }
     return out;
   }
-  static const char *const PAD[BP_COUNT] = { "A", "B", "X", "Y", "BACK", "START", "L STICK", "R STICK", "LB", "RB", "D-PAD UP",
+  static const char *const PAD[BP_W0] = { "A", "B", "X", "Y", "BACK", "START", "L STICK", "R STICK", "LB", "RB", "D-PAD UP",
                                              "D-PAD DOWN", "D-PAD LEFT", "D-PAD RIGHT", "STICK LEFT", "STICK RIGHT", "STICK UP",
                                              "STICK DOWN", "RT", "LT" };
-  if (s->code >= 0 && s->code < BP_COUNT) return PAD[s->code];
+  if (s->code >= BP_W0 && s->code < BP_COUNT) {
+    snprintf(out, 40, "WHEEL BTN %d", s->code - BP_W0 + 1);
+    return out;
+  }
+  if (s->code >= 0 && s->code < BP_W0) return PAD[s->code];
   snprintf(out, 40, "PAD %d", s->code);
   return out;
 }

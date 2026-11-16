@@ -48,6 +48,9 @@ void app_toggle_fullscreen(void);
 void app_window_row(int on);
 /* the controller rumble now, 0..1 each: the heavy motor and the light (zero outside a running race; haptic.h) */
 void app_rumble(float *low, float *high);
+/* the steering wheel's forces now (ffb.h; the platform plays them on the chosen device; zero outside a running race, the test's anywhere) */
+struct ffb_out_s;
+void app_ffb(struct ffb_out_s *out);
 float app_speed_kmh(void); /* the player's car's speed, signed */
 /* The iPad's turn about the screen's normal from level (radians, clockwise as the player
  * sees it positive), for steering by tilt (the OPTION screen's GYRO); main.m each frame. */

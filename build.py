@@ -43,8 +43,8 @@ ZIG = {  # (url, sha256) from ziglang.org/download/index.json
     "x86_64-macos": ("https://ziglang.org/download/%s/zig-x86_64-macos-%s.tar.xz" % (ZIG_VER, ZIG_VER), "9af07b20319fbd0c92ee46ad23e81d6a782b1aaea2cfb8dcbff35f1d2c7ddbb7"),
     "aarch64-macos": ("https://ziglang.org/download/%s/zig-aarch64-macos-%s.tar.xz" % (ZIG_VER, ZIG_VER), "75f1bc7a1e9852f17ec9a0c1895f767c4ec56d46bc8a834920eece1d0359dd8d"),
 }
-SRCS = ("platform/sdl2/main_sdl.c platform/sdl2/bgm.c platform/sdl2/movie.c src/app.c src/render.c src/hud.c src/car.c src/collide.c src/sound.c "
-        "src/anm.c src/menu.c src/bind.c src/lights.c src/spark.c src/haptic.c src/net.c src/vs_host.c src/nat.c src/title.c src/phys/rc_runtime.c").split()
+SRCS = ("platform/sdl2/main_sdl.c platform/sdl2/wheel.c platform/sdl2/bgm.c platform/sdl2/movie.c src/app.c src/render.c src/hud.c src/car.c src/collide.c src/sound.c "
+        "src/anm.c src/menu.c src/bind.c src/lights.c src/spark.c src/haptic.c src/ffb.c src/net.c src/vs_host.c src/nat.c src/title.c src/phys/rc_runtime.c").split()
 GENERATED = ["src/phys/phys_rc.c", "src/phys/rc_addr.h", "src/cardb.h"]
 
 

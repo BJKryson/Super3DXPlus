@@ -18,7 +18,10 @@ enum { BR_LEFT, BR_RIGHT, BR_GAS, BR_BRAKE, BR_SHIFT_UP, BR_SHIFT_DOWN, BR_CAMER
 
 /* pad inputs: buttons, the left stick's four directions and the two triggers (as buttons, past a threshold) */
 enum { BP_A, BP_B, BP_X, BP_Y, BP_BACK, BP_START, BP_LSTICK, BP_RSTICK, BP_LB, BP_RB, BP_DUP, BP_DDOWN, BP_DLEFT, BP_DRIGHT,
-       BP_STICK_LEFT, BP_STICK_RIGHT, BP_STICK_UP, BP_STICK_DOWN, BP_RT, BP_LT, BP_COUNT };
+       BP_STICK_LEFT, BP_STICK_RIGHT, BP_STICK_UP, BP_STICK_DOWN, BP_RT, BP_LT,
+       /* a steering wheel's buttons, as the joystick layer numbers them (the first BP_WHEELS of them) */
+       BP_W0, BP_WHEEL_LAST = BP_W0 + 31, BP_COUNT };
+#define BP_WHEELS 32
 
 /* two keys the binding screen itself takes (SDL's keycodes): leave the capture, clear the slot */
 #define BK_ESCAPE 27
@@ -54,7 +57,11 @@ int bind_dirty(void);
  * game controller axes: the sticks -1..1, the triggers 0..1); an action takes one, inverted or not, with a dead zone (percent). The
  * digital inputs above still work beside them (a pressed key wins over the axis). ---- */
 enum { BA_STEER, BA_GAS, BA_BRAKE, BA_COUNT };
-enum { AXIS_NONE = -1, AXIS_LEFTX, AXIS_LEFTY, AXIS_RIGHTX, AXIS_RIGHTY, AXIS_TRIGL, AXIS_TRIGR, AXIS_COUNT };
+enum { AXIS_NONE = -1, AXIS_LEFTX, AXIS_LEFTY, AXIS_RIGHTX, AXIS_RIGHTY, AXIS_TRIGL, AXIS_TRIGR,
+       /* a steering wheel's first eight axes (the joystick layer's, -1..1: a pedal rests at one end and goes to the other) */
+       AXIS_W0, AXIS_W7 = AXIS_W0 + 7, AXIS_COUNT };
+#define AXIS_WHEELS 8
+#define AXIS_PAD 6 /* the game controller's axes (the first of them) */
 typedef struct { int axis, invert, dead, sens; } bind_axis; /* dead: percent of the throw ignored about rest; sens: percent, the value's gain after it (100 as it is) */
 
 const char *bind_axis_action_name(int action);
