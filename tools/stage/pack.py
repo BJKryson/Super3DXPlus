@@ -158,6 +158,12 @@ def encode16(im, max_size, dither=False):
     # resized colour and alpha apart (else it came out black), the alpha dropped, the colour dithered into 565 (4444's 16 levels a
     # channel banded a sky badly)
     colour_only = im.mode == "RGBA" and np.asarray(im.getchannel("A")).mean() < 8
+    if colour_only:
+        # ... but not a light mask: pure white with a faint alpha (the tunnel mouths' nondxt_sk_nk_lighteff01, alpha 17 at most) is the
+        # glow's shape; without its alpha it is an opaque white wall at the tunnel's exit
+        rgb = np.asarray(im.convert("RGB"))
+        if rgb.min() >= 240 and rgb.reshape(-1, 3).std(axis=0).max() < 4:
+            colour_only = False
     if (w, h) != im.size:
         im = resize_rgba(im, (w, h)) if colour_only else im.resize((w, h), Image.LANCZOS)
     a = np.asarray(im, dtype=np.uint16)

@@ -33,6 +33,7 @@ What Super3DX+ adds or changes compared with [Re3DX+](NOTICE.md). Longer explana
 - Restored original reflection handling, applied to rival cars
 - Tire smoke, headlight flares and the missing shift light
 - Fixed the reflective buildings of the morning Tokyo maps (New Belt Line, C1, Yokohane) showing checkered, see-through facades with things moving behind them: the reflection program added the gloss map's alpha to the base alpha, which went above 1 and, blended into a floating-point target, subtracted what was behind. The alpha is clamped; both map vertex shaders also declare the vertex position invariant, so surfaces at nearly the same depth keep their order on every GPU
+- Fixed a solid white wall at the exit of the C1 tunnels (about 10.8 km into C1 inward): the data build dropped the alpha of the tunnel mouths' faint white light mask (nondxt_sk_nk_lighteff01, alpha 17 at most) as if it were a sky dome, so it drew opaque. Rebuild the Tokyo packs (python tools/pipeline.py convert <arcade data> --only tokyo-day) to get the fix
 - Exhaust flames follow the tuned exhaust's pipes (the Savanna RX-7's single tuned pipe, and other cars)
 - Arcade-style race HUD alongside the touch HUD, with a debug options menu
 - Texture sharpness and graphics options (HD textures, wet road, paint reflections, anti-aliasing)

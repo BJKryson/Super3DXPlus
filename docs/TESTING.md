@@ -14,6 +14,7 @@ Set as environment variables (they do nothing unset, and silence the sound unles
 | `MT3DX_AUTOQUIT=s` | leave after s seconds |
 | `MT3DX_AUTODRIVE=1` `MT3DX_AUTODRIVE_KMH=n` | hold the accelerator in a race (below n km/h) |
 | `WMMT_PILOT=1` `WMMT_PILOT_BIAS=x` `WMMT_PILOT_LOG=1` | the arcade's own pilot steers (with `MT3DX_AUTODRIVE`); BIAS adds a steady steering offset (about -0.05 or 0.05) to hug a lane and clear the centre dividers; LOG prints the pilot's numbers every 2 s |
+| Android: `test.env` in the save folder | `KEY=VALUE` lines set as environment variables at start (`MT3DX_AUTODRIVE`, `MT3DX_AUTODRIVE_KMH`, `WMMT_PILOT*`); the menus are driven with `adb shell input gamepad keyevent`. Delete the file after a test: it makes the car drive itself |
 | `MT3DX_VSAUTO=host[:n]\|join` | host a LAN game and start it once n machines are in, or join the first found |
 | `MT3DX_VSKM=n` | a versus race of n km (short, to test the flow) |
 | `MT3DX_NETLOG=1`, `MT3DX_NET_LAG=ms` | the netcode's measurements; an artificial lag on received packets |

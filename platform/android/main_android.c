@@ -410,6 +410,9 @@ static void *game(void *arg) {
     float dt = last > 0 ? (float)(now - last) : 1.0f / 30.0f;
     last = now;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (getenv("MT3DX_AUTODRIVE") && app_racing()) { /* tests: the accelerator held in a race, only below MT3DX_AUTODRIVE_KMH */
+      app_key(APP_KEY_ACCEL, !getenv("MT3DX_AUTODRIVE_KMH") || app_speed_kmh() < (float)atof(getenv("MT3DX_AUTODRIVE_KMH")));
+    }
     app_frame(dt);
     sync_movie();
     pad_rumble_frame();
@@ -463,6 +466,17 @@ JNIEXPORT void JNICALL JFN(nativeStart)(JNIEnv *env, jclass cls, jobject activit
   freopen(log, "w", stderr);
   setvbuf(stderr, NULL, _IONBF, 0);
   fprintf(stderr, "start (android)\n");
+  { /* tests: <save>/test.env, KEY=VALUE lines set as environment variables (MT3DX_AUTODRIVE, WMMT_PILOT, ... as docs/TESTING.md) */
+    char tp[600], ln[200];
+    snprintf(tp, sizeof tp, "%s/test.env", A.save_dir);
+    FILE *f = fopen(tp, "r");
+    while (f && fgets(ln, sizeof ln, f)) {
+      char *e = strchr(ln, '=');
+      ln[strcspn(ln, "\r\n")] = 0;
+      if (e && ln[0] != '#') *e = 0, setenv(ln, e + 1, 1), fprintf(stderr, "test env %s=%s\n", ln, e + 1);
+    }
+    if (f) fclose(f);
+  }
   pthread_mutex_init(&A.mx, NULL);
   pthread_cond_init(&A.cv, NULL);
   pthread_t t;
