@@ -233,6 +233,8 @@ def build_exe(target, cc, opt, jobs):
             die("SDL2 development files not found: install libsdl2-dev (and libegl1-mesa-dev, libgles2-mesa-dev), see docs/BUILDING.md")
         flags += sdlc
         link = sdll + ["-lEGL", "-lGLESv2", "-lm", "-lpthread"]
+        if sysroot:
+            link = ["--sysroot=" + sysroot] + link  # (the link too: libm.so's script names /lib/... inside the sysroot)
         exe = os.path.join(out, "super3dx")
     cflags = flags + inc
     key = " ".join(tc.cc + cflags)
