@@ -59,13 +59,11 @@ def arcade_view(arcade, view):
     and `cutin/us` (the plain ones empty). Nothing is copied and the dump is not changed. Returns "japan" or "english"."""
     arcade = os.path.abspath(arcade)
     if os.path.lexists(view):
-        if os.path.islink(view) or not os.path.isdir(view):
-            os.remove(view)
-        else:
-            for name in os.listdir(view):
-                p = os.path.join(view, name)
-                _unlink(p)
-            os.rmdir(view)
+        try:
+            _unlink(view)
+        except OSError as e:
+            sys.exit("could not clear %s (%s): close any window or program using that folder (the Explorer, a virus scanner), or delete the folder by hand, "
+                     "and run the setup again" % (view, e))
     os.makedirs(os.path.join(view, "data"))
     _link_file(os.path.join(arcade, "main"), os.path.join(view, "main"))
     for e in os.listdir(os.path.join(arcade, "data")):
@@ -92,17 +90,41 @@ def arcade_view(arcade, view):
     return lang
 
 
-def _unlink(p):
-    """remove a link (never what it points at)"""
-    if os.path.islink(p) or os.path.isfile(p):
-        os.remove(p)
-    elif os.path.isdir(p):
+def _is_link(p):
+    """a symbolic link or a Windows junction (Python's own islink does not see junctions before 3.12, and a reparse point is one either way)"""
+    if os.path.islink(p):
+        return True
+    try:
+        return bool(getattr(os.lstat(p), "st_file_attributes", 0) & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+    except OSError:
+        return False
+
+
+def _retry(fn, p):
+    """a file an antivirus scanner or the Explorer holds for a moment: try again a few times before giving up"""
+    for i in range(6):
         try:
-            os.rmdir(p)  # a junction, or an empty directory
+            return fn(p)
         except OSError:
-            for name in os.listdir(p):
-                _unlink(os.path.join(p, name))
-            os.rmdir(p)
+            if i == 5:
+                raise
+            time.sleep(0.5)
+
+
+def _unlink(p):
+    """remove a link (never what it points at), a file, or a directory of those. Never goes into a link: a junction that would not come off
+    must stop the run, not have the dump it points at emptied."""
+    if _is_link(p):
+        try:
+            _retry(os.remove, p)
+        except OSError:
+            _retry(os.rmdir, p)  # (a link to a directory comes off with rmdir on Windows)
+    elif os.path.isfile(p):
+        _retry(os.remove, p)
+    elif os.path.isdir(p):
+        for name in os.listdir(p):
+            _unlink(os.path.join(p, name))
+        _retry(os.rmdir, p)
 
 
 def tool_env(main):
