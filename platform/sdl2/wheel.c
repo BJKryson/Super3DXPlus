@@ -27,6 +27,15 @@ static struct {
   /* what was last sent, to send only a change */
   int s_force, s_spring, s_damper, s_vib, s_hz, s_gain;
   int playing;
+  /* keeping the forces alive (a wheel's driver can drop them after a while: the T300RS, issue 2) */
+  int failed;              /* a force update was refused since the last look */
+  Uint32 watch_at;         /* when the effects were last asked whether they still play */
+  Uint32 reopened_at;      /* when the device was last opened again by the watchdog */
+  Uint32 restart_t0;       /* the window the restarts are counted in */
+  int restarts;
+  int seen;                /* bit i: force i has been seen playing (a driver that never says so is not asked again) */
+  Uint32 reopen_t0;        /* the minute the reopenings are counted in */
+  int reopens;
 } W = { .instance = -1, .rescan = 1, .fx_const = -1, .fx_spring = -1, .fx_damper = -1, .fx_sine = -1 };
 
 void wheel_init(const wheel_sink *sink) { W.sink = *sink; }
@@ -88,6 +97,8 @@ static void close_wheel(void) {
   W.h = NULL, W.j = NULL, W.instance = -1, W.name[0] = 0, W.caps = 0;
   W.fx_const = W.fx_spring = W.fx_damper = W.fx_sine = -1;
   W.playing = 0;
+  W.s_force = W.s_spring = W.s_damper = W.s_vib = W.s_hz = 0, W.s_gain = 0; /* (new effects start at nothing, so what is sent next is a change) */
+  W.failed = 0, W.seen = 0;
 }
 
 static void cartesian(SDL_HapticDirection *d) {
@@ -120,8 +131,11 @@ static void dlog(const char *fmt, ...) {
 
 static void diag_begin(void) {
   char path[1100];
+  static int first = 1; /* (the file is the whole session's: later openings, the watchdog's included, are added to it) */
   snprintf(path, sizeof path, "%s/wheel-diag.txt", diag_dir[0] ? diag_dir : ".");
-  D = fopen(path, "w");
+  D = fopen(path, first ? "w" : "a");
+  if (!first && D) fprintf(D, "\n---- the wheel was opened again ----\n");
+  first = 0;
   SDL_version v;
   SDL_GetVersion(&v);
   dlog("Super3DX+ wheel report; SDL %d.%d.%d on %s; joystick driver hints: RAWINPUT=%s WGI=%s HIDAPI=%s DIRECTINPUT=%s XINPUT=%s", v.major, v.minor,
@@ -298,13 +312,83 @@ static void sync_device(void) {
 
 static Sint16 s16(float v) { return (Sint16)(fmaxf(-1.0f, fminf(1.0f, v)) * 32767.0f); }
 
+/* a line in the report (wheel-diag.txt, added to) for something that happened while playing */
+static void rlog(const char *fmt, ...) {
+  char s[300], path[1100];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(s, sizeof s, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "wheel: %s\n", s);
+  snprintf(path, sizeof path, "%s/wheel-diag.txt", diag_dir[0] ? diag_dir : ".");
+  FILE *f = fopen(path, "a");
+  if (f) fprintf(f, "[%u s] %s\n", (unsigned)(SDL_GetTicks() / 1000), s), fclose(f);
+}
+
 static void effect_update(int id, SDL_HapticEffect *e) {
-  if (id >= 0 && SDL_HapticUpdateEffect(W.h, id, e) != 0) fprintf(stderr, "wheel: update effect: %s\n", SDL_GetError());
+  if (id >= 0 && SDL_HapticUpdateEffect(W.h, id, e) != 0) {
+    static Uint32 last_log;
+    if (SDL_GetTicks() - last_log > 2000) last_log = SDL_GetTicks(), rlog("a force update was refused: %s", SDL_GetError());
+    W.failed = 1;
+  }
+}
+
+/* the device again, as turning the wheel off and on in the settings does (at most once a second, and not for ever: the reason is logged) */
+static void reopen(const char *why) {
+  const Uint32 now = SDL_GetTicks();
+  if (now - W.reopened_at < 1000) return;
+  W.reopened_at = now;
+  if (now - W.reopen_t0 > 60000) W.reopen_t0 = now, W.reopens = 0;
+  if (++W.reopens > 5) { /* (it is not helping: leave it to the settings, and say so once) */
+    if (W.reopens == 6) rlog("%s: the wheel was opened again 5 times in a minute and keeps failing; not trying any more until it is chosen again", why);
+    W.failed = 0;
+    return;
+  }
+  char name[sizeof W.name];
+  snprintf(name, sizeof name, "%s", W.name);
+  for (int i = 0; i < W.n; ++i)
+    if (!strcmp(ffb_device_name(i), name)) {
+      rlog("%s: opening %s again", why, name);
+      open_wheel(i);
+      return;
+    }
+}
+
+/* every half second: do the forces still play? An infinite effect that is not running was dropped by the driver: start it again, and if that keeps
+ * happening (or a force update is refused) open the device again */
+static void watchdog(void) {
+  const Uint32 now = SDL_GetTicks();
+  if (now - W.watch_at < 500) return;
+  W.watch_at = now;
+  if (W.failed) {
+    W.failed = 0;
+    reopen("a force update failed");
+    return;
+  }
+  if (!(W.caps & SDL_HAPTIC_STATUS)) return;
+  const int ids[4] = { W.fx_const, W.fx_spring, W.fx_damper, W.fx_sine };
+  for (int i = 0; i < 4; ++i) {
+    if (ids[i] < 0) continue;
+    const int st = SDL_HapticGetEffectStatus(W.h, ids[i]);
+    if (st == 1) W.seen |= 1 << i;
+    if (st == 0 && (W.seen & (1 << i))) { /* (1 playing, -1 the driver cannot say; one never seen playing is not trusted to say) */
+      if (now - W.restart_t0 > 10000) W.restart_t0 = now, W.restarts = 0;
+      ++W.restarts;
+      rlog("force %d had stopped (%d in 10 s): starting it again", i, W.restarts);
+      if (SDL_HapticRunEffect(W.h, ids[i], 1) != 0) rlog("  it would not start: %s", SDL_GetError());
+      if (W.restarts >= 3) {
+        reopen("the forces keep stopping");
+        return;
+      }
+    }
+  }
 }
 
 void wheel_frame(void) {
   sync_device();
   if (!W.h || !W.playing) return;
+  watchdog();
+  if (!W.h || !W.playing) return; /* (it may have been opened again) */
   ffb_out o;
   app_ffb(&o);
   if (!o.on) {

@@ -239,6 +239,11 @@ does not offer forces to DirectInput, so check its own software for a DirectInpu
 wheel's forces said. If SDL's own link from the joystick to its force device fails, the player tries the force device with the same name
 before giving up. When forces are not available the settings screen says so and names that file; attach it to a report.
 
+**Forces that stop after a while** (some drivers drop a running effect, the Thrustmaster T300RS did): twice a second the player asks the wheel whether
+each force still plays. One that was playing and has stopped is started again; if that happens three times in ten seconds, or the wheel refuses a
+force update, the wheel is opened again by itself, as turning the device off and on in the settings does (at most five times a minute, then it is
+left alone). Each of these is a line with the time in `wheel-diag.txt`, so a report shows what the driver did and when.
+
 ## Window mode (the PC player)
 
 GAME OPTIONS > WINDOW MODE switches between a window and borderless fullscreen; F11 or Alt+Enter does the same at any time. The choice is
