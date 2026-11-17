@@ -134,6 +134,8 @@ get different app ids (`com.wmmt.port`, `com.wmmt.port.export`), so both can be 
 `.super3dx/android/debug.keystore`: **keep it**, because Android only installs an update over an app signed with the same key (a different key means uninstalling first, which
 deletes the app's saves). Its log is `build/logs/setup-android-<date>.txt`.
 
+Everything on the Android device itself, with no PC (Termux): `docs/ANDROID_ON_DEVICE.md`.
+
 By hand: `python platform/android/build_apk.py --sdk <Android SDK> --jdk <JDK> --out app.apk [--pkg ... --label ... --embed <data folder>]` (the same on every OS), or the older
 `platform/android/build.sh` (bash; `tools/dev/setup_wsl.sh --android` installs its tools on Ubuntu), after `python build.py gensrc <your game folder>`;
 `platform/android/deploy.ps1` installs over USB.

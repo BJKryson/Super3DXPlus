@@ -57,6 +57,8 @@ def _font_dirs():
     dirs = [p for p in os.environ.get("MT3DX_FONT_DIRS", "").replace(";", os.pathsep).split(os.pathsep) if p]
     if os.name == "nt":
         dirs += [os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"), os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Windows", "Fonts")]
+    if os.environ.get("PREFIX"):  # (Termux keeps its packages' fonts under its own prefix)
+        dirs.append(os.path.join(os.environ["PREFIX"], "share", "fonts"))
     dirs += ["/usr/share/fonts", "/usr/local/share/fonts", os.path.expanduser("~/.fonts"), os.path.expanduser("~/.local/share/fonts"),
              "/Library/Fonts", "/System/Library/Fonts", "/System/Library/Fonts/Supplemental", os.path.expanduser("~/Library/Fonts")]
     return dirs

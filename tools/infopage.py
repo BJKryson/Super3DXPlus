@@ -38,7 +38,12 @@ def font_path():
     for p in FONTS + sorted(glob.glob("/System/Library/AssetsV2/*/*/AssetData/PingFang.ttc")):
         if os.path.exists(p):
             return p
-    raise SystemExit("infopage.py: no CJK font found (tried %s)" % ", ".join(FONTS))
+    try:  # (any Noto Sans CJK in the font folders: MT3DX_FONT_DIRS, Termux's `pkg install otf-noto-sans-cjk`, ...)
+        from sysdeps import find_font
+        return find_font("NotoSansCJK-Regular.ttc", "NotoSansCJK-Regular.otf", "NotoSansCJKsc-Regular.otf", "NotoSansSC-Regular.otf")
+    except SystemExit:
+        pass
+    raise SystemExit("infopage.py: no CJK font found (tried %s; Termux: pkg install otf-noto-sans-cjk)" % ", ".join(FONTS))
 
 
 def _font(size):
