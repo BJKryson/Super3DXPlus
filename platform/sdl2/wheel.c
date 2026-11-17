@@ -1,6 +1,7 @@
 #include "wheel.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,11 +101,81 @@ static int make(Uint32 caps, Uint32 bit, SDL_HapticEffect *e) {
   return SDL_HapticNewEffect(W.h, e);
 }
 
+/* ---- the report: <save dir>/wheel-diag.txt, rewritten each time a wheel is opened (and the same lines on stderr), what a wheel that
+ * "has no forces" needs to be understood from: the device's ids, SDL's lists and hints, and what each way of opening it said ---- */
+static char diag_dir[1024];
+static FILE *D;
+
+void wheel_diag_dir(const char *dir) { snprintf(diag_dir, sizeof diag_dir, "%s", dir ? dir : ""); }
+
+static void dlog(const char *fmt, ...) {
+  char s[400];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(s, sizeof s, fmt, ap);
+  va_end(ap);
+  fprintf(stderr, "wheel: %s\n", s);
+  if (D) fprintf(D, "%s\n", s);
+}
+
+static void diag_begin(void) {
+  char path[1100];
+  snprintf(path, sizeof path, "%s/wheel-diag.txt", diag_dir[0] ? diag_dir : ".");
+  D = fopen(path, "w");
+  SDL_version v;
+  SDL_GetVersion(&v);
+  dlog("Super3DX+ wheel report; SDL %d.%d.%d on %s; joystick driver hints: RAWINPUT=%s WGI=%s HIDAPI=%s DIRECTINPUT=%s XINPUT=%s", v.major, v.minor,
+       v.patch, SDL_GetPlatform(), SDL_GetHint("SDL_JOYSTICK_RAWINPUT") ? SDL_GetHint("SDL_JOYSTICK_RAWINPUT") : "-",
+       SDL_GetHint("SDL_JOYSTICK_WGI") ? SDL_GetHint("SDL_JOYSTICK_WGI") : "-", SDL_GetHint("SDL_JOYSTICK_HIDAPI") ? SDL_GetHint("SDL_JOYSTICK_HIDAPI") : "-",
+       SDL_GetHint("SDL_DIRECTINPUT_ENABLED") ? SDL_GetHint("SDL_DIRECTINPUT_ENABLED") : "-", SDL_GetHint("SDL_XINPUT_ENABLED") ? SDL_GetHint("SDL_XINPUT_ENABLED") : "-");
+  dlog("SDL haptic subsystem: %s", SDL_WasInit(SDL_INIT_HAPTIC) ? "started" : "NOT started (no forces for anything)");
+  const int nj = SDL_NumJoysticks();
+  dlog("%d joystick(s):", nj);
+  for (int i = 0; i < nj; ++i) {
+    char guid[40];
+    SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof guid);
+    dlog("  [%d] %s  vid %04x pid %04x  guid %s  %s", i, SDL_JoystickNameForIndex(i) ? SDL_JoystickNameForIndex(i) : "?", SDL_JoystickGetDeviceVendor(i),
+         SDL_JoystickGetDeviceProduct(i), guid, SDL_IsGameController(i) ? "(a game controller)" : "");
+  }
+  const int nh = SDL_NumHaptics();
+  dlog("%d force feedback device(s) in SDL's list (DirectInput's, on Windows)%s", nh, nh <= 0 ? ": none, so the wheel's driver does not offer forces to DirectInput" : ":");
+  for (int i = 0; i < nh; ++i) dlog("  haptic [%d] %s", i, SDL_HapticName(i) ? SDL_HapticName(i) : "?");
+}
+
+static void diag_end(void) {
+  if (D) fclose(D);
+  D = NULL;
+}
+
+/* SDL's haptic device for the joystick, by name, when the joystick's own link to it fails (a wheel can be opened as a joystick by one of SDL's
+ * drivers and listed as a force device by DirectInput under the same name) */
+static SDL_Haptic *haptic_by_name(const char *jname) {
+  if (!jname) return NULL;
+  const int nh = SDL_NumHaptics();
+  for (int i = 0; i < nh; ++i) {
+    const char *hn = SDL_HapticName(i);
+    if (hn && (!strcmp(hn, jname) || strstr(hn, jname) || strstr(jname, hn))) {
+      SDL_Haptic *h = SDL_HapticOpen(i);
+      dlog("  SDL_HapticOpen(%d, \"%s\"): %s%s%s", i, hn, h ? "opened" : "failed: ", h ? "" : SDL_GetError(), "");
+      if (h) return h;
+    }
+  }
+  return NULL;
+}
+
+static void open_wheel_inner(int list_i);
 static void open_wheel(int list_i) {
+  diag_begin();
+  open_wheel_inner(list_i);
+  diag_end();
+}
+
+static void open_wheel_inner(int list_i) {
   close_wheel();
   W.j = SDL_JoystickOpen(W.index[list_i]);
   if (!W.j) {
     say("COULD NOT OPEN IT: %s", SDL_GetError(), 0, 0);
+    dlog("SDL_JoystickOpen failed: %s", SDL_GetError());
     return;
   }
   W.instance = (int)SDL_JoystickInstanceID(W.j);
@@ -115,21 +186,35 @@ static void open_wheel(int list_i) {
   for (int a = 0; a < na && a < AXIS_WHEELS; ++a) W.sink.axis(AXIS_W0 + a, SDL_JoystickGetAxis(W.j, a));
   char info[160];
   snprintf(info, sizeof info, "%d AXES, %d BUTTONS", na, SDL_JoystickNumButtons(W.j));
-  fprintf(stderr, "wheel: opened %s (%s)\n", W.name, info);
+  {
+    char guid[40];
+    SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(W.j), guid, sizeof guid);
+    dlog("opened %s: vid %04x pid %04x, guid %s, %s, %d hats", W.name, SDL_JoystickGetVendor(W.j), SDL_JoystickGetProduct(W.j), guid, info,
+         SDL_JoystickNumHats(W.j));
+  }
   if (SDL_JoystickIsHaptic(W.j) <= 0) {
-    say("%s; NO FORCE FEEDBACK ON IT", info, 0, 0);
-    fprintf(stderr, "wheel: SDL_JoystickIsHaptic: no (%s)\n", SDL_GetError());
+    say("%s; NO FORCE FEEDBACK ON IT (SEE wheel-diag.txt IN THE SAVE FOLDER)", info, 0, 0);
+    dlog("SDL_JoystickIsHaptic: no (%s): SDL does not see forces on this device", SDL_GetError());
     return;
   }
   W.h = SDL_HapticOpenFromJoystick(W.j);
+  char err[96] = "";
   if (!W.h) {
-    char err[64];
     snprintf(err, sizeof err, "%s", SDL_GetError()); /* (what SDL says, on the screen: the one thing a report needs) */
-    snprintf(info + strlen(info), sizeof info - strlen(info), "; FORCES NOT AVAILABLE (%s)", err);
+    dlog("SDL_HapticOpenFromJoystick failed: %s; trying the force feedback list by the joystick's name", err);
+    W.h = haptic_by_name(SDL_JoystickName(W.j));
+    if (W.h) dlog("opened through the list instead: forces on");
+  }
+  if (!W.h) {
+    snprintf(info + strlen(info), sizeof info - strlen(info), "; FORCES NOT AVAILABLE (%.60s); SEE wheel-diag.txt IN THE SAVE FOLDER", err);
     say("%s", info, 0, 0);
-    fprintf(stderr, "wheel: SDL_HapticOpenFromJoystick: %s\n", SDL_GetError());
+    dlog("no way of opening its forces worked");
     return;
   }
+  dlog("force feedback open; features %08x (constant %d, spring %d, damper %d, sine %d, gain %d, autocenter %d); %d effects at once", SDL_HapticQuery(W.h),
+       !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_CONSTANT), !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_SPRING), !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_DAMPER),
+       !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_SINE), !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_GAIN), !!(SDL_HapticQuery(W.h) & SDL_HAPTIC_AUTOCENTER),
+       SDL_HapticNumEffects(W.h));
   W.caps = SDL_HapticQuery(W.h);
   if (W.caps & SDL_HAPTIC_GAIN) SDL_HapticSetGain(W.h, 100);
   if (W.caps & SDL_HAPTIC_AUTOCENTER) SDL_HapticSetAutocenter(W.h, 0); /* (the driver's spring would fight the game's) */
@@ -171,9 +256,9 @@ static void open_wheel(int list_i) {
   if (W.fx_damper >= 0) strcat(what, "DAMPER ");
   if (W.fx_sine >= 0) strcat(what, "VIBRATION ");
   if (!what[0]) {
-    snprintf(info + strlen(info), sizeof info - strlen(info), "; NO USABLE FORCE TYPES");
+    snprintf(info + strlen(info), sizeof info - strlen(info), "; NO USABLE FORCE TYPES (SEE wheel-diag.txt)");
     say("%s", info, 0, 0);
-    fprintf(stderr, "wheel: no usable effect (caps %08x): %s\n", W.caps, SDL_GetError());
+    dlog("no usable effect (features %08x): %s", W.caps, SDL_GetError());
     return;
   }
   char s[200];

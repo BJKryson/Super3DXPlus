@@ -233,6 +233,12 @@ opened and which force types it created (stderr). If the wheel is listed but the
 are the cause (on Linux the `/dev/input/event*` node must be writable by the player's user). Useful in a report: the wheel's model, OS, the
 `wheel:` line, which forces were felt, and whether INVERT FORCE was needed.
 
+Each time a wheel is opened the player also writes **`wheel-diag.txt` in the save folder**: SDL's version and joystick driver settings, every
+joystick with its vendor and product ids, the force feedback devices SDL lists (on Windows DirectInput's: none listed means the wheel's driver
+does not offer forces to DirectInput, so check its own software for a DirectInput or compatibility setting), and what each way of opening the
+wheel's forces said. If SDL's own link from the joystick to its force device fails, the player tries the force device with the same name
+before giving up. When forces are not available the settings screen says so and names that file; attach it to a report.
+
 ## Window mode (the PC player)
 
 GAME OPTIONS > WINDOW MODE switches between a window and borderless fullscreen; F11 or Alt+Enter does the same at any time. The choice is

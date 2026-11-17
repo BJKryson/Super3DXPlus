@@ -934,6 +934,7 @@ int main(int argc, char **argv) {
   {
     static const wheel_sink sink = { wheel_axis_sink, wheel_button_sink };
     wheel_init(&sink);
+    wheel_diag_dir(P.save_dir);
   }
   P.mx = SDL_CreateMutex();
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);

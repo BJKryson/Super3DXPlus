@@ -12,6 +12,8 @@ typedef struct {
 } wheel_sink;
 
 void wheel_init(const wheel_sink *sink);
+/* the folder the wheel report (wheel-diag.txt: the device, SDL's lists, what opening its forces said) is written to: the save folder */
+void wheel_diag_dir(const char *dir);
 /* from the event loop (any thread that pumps events): the joystick events */
 void wheel_event(const SDL_Event *e);
 /* the chosen wheel's instance id, -1 for none (its game controller events are ignored: the raw ones are the wheel's) */
