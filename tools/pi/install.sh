@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs the game on a Pi that has booted Raspberry Pi OS Lite (64-bit, trixie) with SSH and your user (tools/pi/prep_boot.ps1):
+# Installs the game on a Pi that has booted Raspberry Pi OS Lite (64-bit, trixie) with SSH and your user (set in the Raspberry Pi Imager, docs/PI.md):
 #
 #   tools/pi/install.sh <user@host> <converted data dir> [--no-data] [--hdmi]
 #

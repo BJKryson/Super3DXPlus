@@ -18,7 +18,7 @@ below describe what it does and the by-hand way (a prepared card, `tools/pi/inst
   the setup, a USB audio device (the Pi 5 has no headphone jack; HDMI audio is untested, see Audio) and a pad.
 - Composite out of the Pi 5 (its TV-out pads or header, wired to an RCA cable; the software side is the same however you do it).
 - The converted data folder (`docs/BUILDING.md`: `python build.py data <dump>`); no game content is in this repository.
-- A PC to build the data on (any system, `docs/BUILDING.md`), and for Windows the elevated PowerShell scripts below. The player itself can be built on the Pi.
+- A PC to build the data on (any system, `docs/BUILDING.md`), and the Raspberry Pi Imager for the card. The player itself can be built on the Pi.
 
 ## 1. Build the player for the Pi
 
@@ -31,26 +31,20 @@ SYSROOT=/opt/pi-sysroot python3 build.py exe --target pi    # -> build/pi/super3
 
 The sysroot is Debian trixie because current Raspberry Pi OS is: the binary links the glibc and SDL2 the Pi has.
 
-## 2. Prepare the card (Windows)
+## 2. Prepare the card
 
-Download Raspberry Pi OS Lite **64-bit, trixie** (`downloads.raspberrypi.com/raspios_lite_arm64_latest`, check the `.sha256`),
-unpack the `.img.xz`, then from an **elevated** PowerShell (find the card's number and size with
-`Get-Disk | ? BusType -eq USB`):
+Use the official [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (Windows, macOS and Linux):
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\pi\flash_card.ps1 -Image C:\path\raspios.img -Disk 4 -SizeBytes 31914983424
-# if Windows lists no partitions yet, replug the card, then:
-powershell -ExecutionPolicy Bypass -File tools\pi\prep_boot.ps1 -Disk 4 -SizeBytes 31914983424 `
-    -PublicKey $HOME\.ssh\id_ed25519.pub -PasswordHash '<openssl passwd -6 yourpassword>'
-```
+1. Choose the Pi 5, then the operating system **Raspberry Pi OS Lite (64-bit)** (Debian trixie), then your SD card.
+2. When it offers to customise the OS settings, set a **host name** (`wmmt`, or anything), a **user name and password** (the setup asks for
+   the user name), tick **Enable SSH** (password, or your public key), and fill in Wi-Fi if you are not using Ethernet. This also
+   skips the first-boot wizard that otherwise waits for a screen and keyboard.
+3. Write the card, put it in the Pi, connect Ethernet and power, and find it with `ping wmmt.local` (your host name), then
+   `ssh <user>@<address>`.
 
-`prep_boot.ps1` writes into the card's FAT boot partition: the composite settings, and a one-time first-boot script that makes the user
-`wmmt`, turns on SSH with your key and removes the first-boot wizard (which otherwise waits for a screen and keyboard, and
-blocks SSH with "until a valid user has been set up"). Put the card in the Pi, connect Ethernet and power; the Pi reboots
-once by itself. Find it with `ping raspberrypi.local` (the hostname becomes `wmmt`), then `ssh wmmt@<address>`.
-Not on Windows: `dd` the image, then put the same lines in `config.txt` / `cmdline.txt` by hand (below) and add
-`systemd.run=/boot/firmware/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target` after
-filling in `platform/pi/files/firstrun.sh.in`.
+The composite video settings are not needed on the card first: `setup-pi` makes them over SSH (and `install.sh` leaves them to you, see
+"The video settings" below). If you set up by hand and want them on the card before the first boot, edit `config.txt` and `cmdline.txt` on the
+card's boot partition, the FAT one every system can read, with the lines below.
 
 ## 3. Install the game
 
@@ -131,14 +125,15 @@ change `CARD=` for yours, or delete the file for HDMI sound).
 - Pad mapping on the Pi (an Xbox 360 pad works; other pads untested), the launcher/boot menu, a Buildroot image instead of
   Raspberry Pi OS.
 - Audio over HDMI, 4:3 versus the arcade's aspect on a 16:9 screen: untested.
-- `tools/pi/flash_card.ps1`, `prep_boot.ps1` and `install.sh` are the tested steps written down as scripts; each was run in its
-  pieces during the first bring-up, not yet as scripts from a clean start.
+- `tools/pi/install.sh` is the tested steps written down as a script; it was run in its pieces during the first bring-up, not yet as
+  a script from a clean start. (The first bring-up wrote the card with its own scripts; the Raspberry Pi Imager route above replaces them and
+  was not run on this hardware.)
 
 ## HDMI output (optional)
 
 The default is composite on a CRT (above). For an HDMI screen instead, the same player runs without the CRT pass:
 
-1. Prepare the card with `prep_boot.ps1 ... -Hdmi` (it leaves the composite settings out of `config.txt` and `cmdline.txt`), or delete the
+1. Leave the composite settings out of `config.txt` and `cmdline.txt` (`setup-pi` asks which output you want), or delete the
    `video=Composite-1...` and `drm_rp1_vec.cmode=...` parts of `cmdline.txt` and `enable_tvout=1` from `config.txt` on a card already made.
 2. Install with `tools/pi/install.sh wmmt@<address> /path/to/data --hdmi`. That uses `platform/pi/files/wmmt-hdmi.service` (no `--crt`,
    fullscreen at 1920x1080: edit `--size` for your screen's mode) and removes the USB audio default (`/etc/asound.conf`) so ALSA's `default`

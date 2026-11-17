@@ -99,7 +99,7 @@ See: https://www.youtube.com/watch?v=vMuYHEGcGEk
 
 - **Pi 5:** solder a composite video jack onto the J7 pads for composite video, and use a USB sound card for analog audio.
 - **Pi 4 and below:** use a TRRS-to-composite (camcorder style) cable in the headphone jack.
-- **HDMI:** install with `tools/pi/install.sh --hdmi` (or `prep_boot.ps1 -Hdmi`). Untested on real hardware.
+- **HDMI:** install with `tools/pi/install.sh --hdmi`. Untested on real hardware.
 
 Only tested on a Raspberry Pi 5 (8 GB). Other models should work with simple config tweaks, but I don't have the hardware to test.
 

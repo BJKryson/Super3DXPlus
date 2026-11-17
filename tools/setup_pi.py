@@ -21,7 +21,7 @@ SRC_ITEMS = ["build.py", "src", "platform/sdl2", "third_party", "tools/setupkit.
 CMDLINE_VIDEO = "video=Composite-1:720x480,tv_mode=NTSC-J drm_rp1_vec.cmode=27000:721/16/64/58,480/6/6/34"
 
 
-# the composite video settings of the Pi 5 (the same edits tools/pi/prep_boot.ps1 makes to a fresh card); safe to run again, keeps a .super3dx.bak of each file
+# the composite video settings of the Pi 5 (the lines docs/PI.md lists for config.txt and cmdline.txt); safe to run again, keeps a .super3dx.bak of each file
 COMPOSITE_SCRIPT = r"""
 set -e
 CFG=/boot/firmware/config.txt; [ -f $CFG ] || CFG=/boot/config.txt
