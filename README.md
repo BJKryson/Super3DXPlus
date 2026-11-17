@@ -51,6 +51,10 @@ Add `--full` to the setup (`python build.py wizard --full`) to force a complete 
 
 **Prefer to do it by hand, or build for something else?** `docs/BUILDING.md` has the complete manual steps for Windows and Linux (no installer), the individual build commands, and the Raspberry Pi and Android builds (also `docs/PI.md`). Controls and remapping are in `docs/INPUT.md`. To build both the Japan and Export versions, run the setup again and pick the other game folder.
 
+**Are you wild man who wants to build the entire thing on your android phone without a PC?**
+See `docs/ANDROID_ON_DEVICE.md`
+It is substantially harder than building it on a PC, but it is possible.
+
 ## Layout
 
 ```
