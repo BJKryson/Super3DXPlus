@@ -9,8 +9,7 @@ If you have a PC, `setup.bat` / `./setup.sh` and then `setup-android` (see the R
 Termux 0.118 (Python 3.14): a fresh checkout, the data (72 minutes), the app (3 minutes), install, then the game itself: the menus, and a drive
 through C1 inward in the morning (including the tunnel exit at about 10.9 km from the goal, where the ceiling beams and the sky show). The data
 matches a PC's, apart from re-encoded sound and video files (no visible or audible difference) and one comment in a generated file. The Japan
-version uses the same steps but was not tried on a device. The install was done over USB with `adb`; opening the APK from a file manager is the
-normal Android way and was not tried.
+version uses the same steps but was not tried on a device. The app was installed from the Files app, as step 7 describes.
 
 ## What you need
 
@@ -98,8 +97,15 @@ Updating later with a different key means uninstalling first, which deletes the 
 
 ## 7. Install it
 
-Open the phone's file manager (Files), go to `Download`, tap `Super3DXPlus-Export-Android.apk` and install it. Android asks once to allow
-"install unknown apps" for that file manager: allow it. (Open it from the file manager, not from Termux: Termux takes APK links for itself.) Then open **Super3DX+**. The first start copies the game's data (a minute or two).
+Open the phone's file manager (Files), go to `Download` and tap `Super3DXPlus-Export-Android.apk`. Then:
+
+1. If Android asks which app should open it, choose **Package installer** and **Just once**. Do **not** choose Termux: it offers itself for APK
+   files, and it cannot install them.
+2. The first time, Android warns that unknown apps are a risk (or asks you to allow "install unknown apps" for the file manager): allow it
+   (**Continue**).
+3. Tap **Install**, then **Open**.
+
+The first start copies the game's data (a minute or two; the screen stays white or shows the intro movie meanwhile).
 
 Once it is installed you can delete the APK, and the `data` folder and the game folder if you need the space (you need the data again only to
 rebuild).
