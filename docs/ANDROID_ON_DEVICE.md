@@ -5,10 +5,12 @@ minutes), then installing it. It uses [Termux](https://termux.dev), a terminal f
 
 If you have a PC, `setup.bat` / `./setup.sh` and then `setup-android` (see the README) are easier. This page is for when you do not.
 
-**What was tested:** the Export version, on a Retroid Pocket 5 (Android, Snapdragon, 64-bit ARM), with Termux 0.118 (Python 3.14). The data it
-makes matches a PC's, apart from re-encoded sound and video files (no visible or audible difference) and one comment in a generated file. The app
-built this way started and played the game's attract video. The Japan version uses the same steps but was not tried on a device. The final
-install (step 7) was done over USB with `adb`; opening the APK from a file manager is the normal Android way and was not tried.
+**What was tested:** the whole of this page, start to finish, for the Export version on a Retroid Pocket 5 (Android, Snapdragon, 64-bit ARM) with
+Termux 0.118 (Python 3.14): a fresh checkout, the data (72 minutes), the app (3 minutes), install, then the game itself: the menus, and a drive
+through C1 inward in the morning (including the tunnel exit at about 10.9 km from the goal, where the ceiling beams and the sky show). The data
+matches a PC's, apart from re-encoded sound and video files (no visible or audible difference) and one comment in a generated file. The Japan
+version uses the same steps but was not tried on a device. The install was done over USB with `adb`; opening the APK from a file manager is the
+normal Android way and was not tried.
 
 ## What you need
 
