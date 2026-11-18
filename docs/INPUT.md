@@ -208,7 +208,11 @@ XInput-only devices and Android are not covered (Android keeps its pad rumble).
   The choice is saved by name, so it comes back when the wheel is plugged in again.
 - **FORCE FEEDBACK** (on / off), **INVERT FORCE** (switch it if the wheel pulls away from straight ahead; the direction convention of
   drivers differs and could not be checked), **OVERALL** (the device's gain), **STEERING FORCE**, **CENTERING**, **DAMPING**, **ROAD EFFECTS**
-  (tenths, 0-100 %), **TEST** (a sweep from side to side and a shake, 2.5 s) and RESET TO DEFAULT.
+  (tenths, 0-100 %), **STEERING RESPONSE** and **MINIMUM FORCE** (both 0 by default; below), **TEST** (a sweep from side to side and a shake, 2.5 s) and RESET TO DEFAULT.
+- **A wheel that feels almost nothing in a race although TEST is strong** (the Thrustmaster T300RS): TEST pushes hard (85 % of the motor), but the steering
+  force in a race is the tyres' pull, which on a wide road is small (0.3 g is about a tenth of the motor at the default settings), and some drivers ignore forces
+  that faint. Raise STEERING FORCE and OVERALL, then **STEERING RESPONSE** (makes small pulls larger: force to the power 1 - 0.05 n, so 100 % is the 0.5th
+  power) and **MINIMUM FORCE** (any pull gets at least n x 2 % of the motor). Start with STEERING RESPONSE 60 % and MINIMUM FORCE 30 %. Saved as the `curve` line of `ffb`.
 - Saved as `<save dir>/ffb`. Defaults are mild (overall 60 %).
 
 **Steering and pedals** come in as the wheel's raw joystick axes (the chosen wheel is read as a joystick, not as a game controller, because
