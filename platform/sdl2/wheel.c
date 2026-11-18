@@ -40,6 +40,48 @@ static struct {
   Uint32 zero_log;         /* when the steering force's change to or from nothing was last logged */
 } W = { .instance = -1, .rescan = 1, .fx_const = -1, .fx_spring = -1, .fx_damper = -1, .fx_sine = -1 };
 
+/* ---- the game devices that feed the bindings (a shifter, a button box, pedals, a wheel's second interface): slot 0 is the chosen wheel, the
+ * others the rest of the list in SDL's order; a slot's buttons and axes are bind.h's BP_W0 + slot * BP_PER_DEV.., AXIS_W0 + slot * AXIS_PER_DEV.. ---- */
+static struct {
+  SDL_Joystick *j[WHEEL_DEVS]; /* the ones this layer opened for the slots (not the chosen wheel's own handle) */
+  int inst[WHEEL_DEVS];        /* each slot's instance id, -1 for none */
+  int hat[WHEEL_DEVS];
+  int last_instance, relists, seen_relists;
+} S = { .inst = { -1, -1, -1, -1 }, .last_instance = -2 };
+
+static void slots_close(void) {
+  for (int s = 0; s < WHEEL_DEVS; ++s) {
+    if (S.j[s]) SDL_JoystickClose(S.j[s]);
+    S.j[s] = NULL, S.inst[s] = -1, S.hat[s] = 0;
+  }
+}
+
+static void slots_refresh(void) {
+  slots_close();
+  int s = 0;
+  if (W.instance >= 0) S.inst[s++] = W.instance; /* (slot 0: the wheel whose forces are chosen) */
+  for (int i = 0; i < W.n && s < WHEEL_DEVS; ++i) {
+    SDL_Joystick *j = SDL_JoystickOpen(W.index[i]);
+    if (!j) continue;
+    const int inst = (int)SDL_JoystickInstanceID(j);
+    if (inst == W.instance) { /* (the chosen one's own handle is W.j) */
+      SDL_JoystickClose(j);
+      continue;
+    }
+    S.j[s] = j, S.inst[s] = inst;
+    const int na = SDL_JoystickNumAxes(j);
+    for (int a = 0; a < na && a < AXIS_PER_DEV; ++a) W.sink.axis(AXIS_W0 + s * AXIS_PER_DEV + a, SDL_JoystickGetAxis(j, a)); /* (where it rests) */
+    fprintf(stderr, "wheel: input device %d: %s (%d axes, %d buttons)\n", s + 1, SDL_JoystickName(j) ? SDL_JoystickName(j) : "?", na, SDL_JoystickNumButtons(j));
+    ++s;
+  }
+}
+
+static int slot_of(int instance) {
+  for (int s = 0; s < WHEEL_DEVS; ++s)
+    if (S.inst[s] == instance && instance >= 0) return s;
+  return -1;
+}
+
 void wheel_init(const wheel_sink *sink) { W.sink = *sink; }
 
 int wheel_instance(void) { return W.instance; }
@@ -72,6 +114,7 @@ static void relist(void) {
     W.index[W.n++] = i;
   }
   ffb_set_devices(W.n, names, haptic);
+  ++S.relists;
 }
 
 /* ---- the open device ---- */
@@ -199,7 +242,7 @@ static void open_wheel_inner(int list_i) {
   W.hat = 0;
   /* where every axis rests now (a pedal that is not moved sends nothing: the bindings must not take it for the middle of its throw) */
   const int na = SDL_JoystickNumAxes(W.j);
-  for (int a = 0; a < na && a < AXIS_WHEELS; ++a) W.sink.axis(AXIS_W0 + a, SDL_JoystickGetAxis(W.j, a));
+  for (int a = 0; a < na && a < AXIS_PER_DEV; ++a) W.sink.axis(AXIS_W0 + a, SDL_JoystickGetAxis(W.j, a));
   char info[160];
   snprintf(info, sizeof info, "%d AXES, %d BUTTONS", na, SDL_JoystickNumButtons(W.j));
   {
@@ -289,7 +332,7 @@ static void open_wheel_inner(int list_i) {
 }
 
 /* the settings' device against the open one */
-static void sync_device(void) {
+static void sync_device_inner(void) {
   if (W.rescan) {
     W.rescan = 0;
     relist();
@@ -310,6 +353,14 @@ static void sync_device(void) {
       open_wheel(i);
       return;
     }
+}
+
+static void sync_device(void) {
+  sync_device_inner();
+  if (W.instance != S.last_instance || S.relists != S.seen_relists) { /* (the chosen wheel or the list changed: the input slots again) */
+    S.last_instance = W.instance, S.seen_relists = S.relists;
+    slots_refresh();
+  }
 }
 
 static Sint16 s16(float v) { return (Sint16)(fmaxf(-1.0f, fminf(1.0f, v)) * 32767.0f); }
@@ -440,7 +491,10 @@ void wheel_frame(void) {
   }
 }
 
-void wheel_quit(void) { close_wheel(); }
+void wheel_quit(void) {
+  close_wheel();
+  slots_close();
+}
 
 /* ---- events ---- */
 
@@ -448,20 +502,26 @@ void wheel_event(const SDL_Event *e) {
   switch (e->type) {
   case SDL_JOYDEVICEADDED:
   case SDL_JOYDEVICEREMOVED: W.rescan = 1; break;
-  case SDL_JOYAXISMOTION:
-    if (e->jaxis.which == W.instance && e->jaxis.axis < AXIS_WHEELS) W.sink.axis(AXIS_W0 + e->jaxis.axis, e->jaxis.value);
+  case SDL_JOYAXISMOTION: {
+    const int s = slot_of(e->jaxis.which);
+    if (s >= 0 && e->jaxis.axis < AXIS_PER_DEV) W.sink.axis(AXIS_W0 + s * AXIS_PER_DEV + e->jaxis.axis, e->jaxis.value);
     break;
+  }
   case SDL_JOYBUTTONDOWN:
-  case SDL_JOYBUTTONUP:
-    if (e->jbutton.which == W.instance && e->jbutton.button < BP_WHEELS) W.sink.button(BP_W0 + e->jbutton.button, e->type == SDL_JOYBUTTONDOWN);
+  case SDL_JOYBUTTONUP: {
+    const int s = slot_of(e->jbutton.which);
+    if (s >= 0 && e->jbutton.button < BP_PER_DEV) W.sink.button(BP_W0 + s * BP_PER_DEV + e->jbutton.button, e->type == SDL_JOYBUTTONDOWN);
     break;
-  case SDL_JOYHATMOTION:
-    if (e->jhat.which == W.instance && e->jhat.hat == 0) { /* the first hat: the D-pad */
+  }
+  case SDL_JOYHATMOTION: {
+    const int s = slot_of(e->jhat.which);
+    if (s >= 0 && e->jhat.hat == 0) { /* the first hat of a device: the D-pad */
       static const struct { int dir, code; } H[4] = { { SDL_HAT_UP, BP_DUP }, { SDL_HAT_DOWN, BP_DDOWN }, { SDL_HAT_LEFT, BP_DLEFT }, { SDL_HAT_RIGHT, BP_DRIGHT } };
       for (int i = 0; i < 4; ++i)
-        if ((W.hat & H[i].dir) != (e->jhat.value & H[i].dir)) W.sink.button(H[i].code, (e->jhat.value & H[i].dir) != 0);
-      W.hat = e->jhat.value;
+        if ((S.hat[s] & H[i].dir) != (e->jhat.value & H[i].dir)) W.sink.button(H[i].code, (e->jhat.value & H[i].dir) != 0);
+      S.hat[s] = e->jhat.value;
     }
     break;
+  }
   }
 }
