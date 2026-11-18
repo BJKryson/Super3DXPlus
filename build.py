@@ -65,21 +65,58 @@ def which(*names):
 
 
 # --------------------------------------------------------------------------------------------- downloads (setup-*)
+def _sha_ok(path, sha256):
+    if not sha256:
+        return True
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest() == sha256
+
+
+def _fetch_with_system_tool(url, part):
+    """Python's own HTTPS can fail on a PC whose certificates it cannot see (an antivirus that inspects HTTPS, a company proxy, a missing root
+    certificate: "CERTIFICATE_VERIFY_FAILED", issue 10). Windows' own downloaders use the system's certificates: try them. True when it worked."""
+    cmds = []
+    if shutil.which("curl"):  # (curl.exe ships with Windows 10 and later, and is on most Linux and Mac systems)
+        cmds.append(["curl", "-L", "--fail", "-sS", "--connect-timeout", "30", "-o", part, url])
+    if os.name == "nt":
+        ps = shutil.which("powershell")
+        if ps:
+            cmds.append([ps, "-NoProfile", "-Command",
+                         "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
+                         "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri '%s' -OutFile '%s'" % (url, part)])
+    for c in cmds:
+        try:
+            if subprocess.run(c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1800).returncode == 0 and os.path.getsize(part) > 0:
+                return True
+        except (OSError, subprocess.SubprocessError):
+            pass
+        try:
+            os.remove(part)
+        except OSError:
+            pass
+    return False
+
+
 def download(url, dest, sha256=None):
-    say("downloading", url)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if os.path.isfile(dest) and _sha_ok(dest, sha256):  # (saved there by hand, from a browser)
+        say("using the file already there:", dest)
+        return
+    say("downloading", url)
+    part = dest + ".part"
     try:
-        with urllib.request.urlopen(url, timeout=60) as r, open(dest + ".part", "wb") as f:
+        with urllib.request.urlopen(url, timeout=60) as r, open(part, "wb") as f:
             shutil.copyfileobj(r, f)
     except OSError as e:  # (URLError, timeouts, a full disk, a refused write are all OSErrors)
-        die("could not download %s\n  (%s)\n  Check your internet connection (a firewall, VPN or proxy can block it) and run this again.\n"
-            "  Or download that file yourself, in a browser, and save it as:\n    %s" % (url, e, dest))
-    if sha256:
-        h = hashlib.sha256(open(dest + ".part", "rb").read()).hexdigest()
-        if h != sha256:
-            os.remove(dest + ".part")
-            die("the download's SHA-256 is %s, expected %s" % (h, sha256))
-    os.replace(dest + ".part", dest)
+        say("Python could not download it (%s); trying the system's downloader" % e)
+        if not _fetch_with_system_tool(url, part):
+            die("could not download %s\n  (%s)\n  Check your internet connection (a firewall, VPN or proxy can block it) and run this again.\n"
+                "  If it says CERTIFICATE_VERIFY_FAILED, an antivirus or proxy is intercepting HTTPS: switch it off for a moment, or use another network.\n"
+                "  Or download that file yourself, in a browser, and save it as exactly this name:\n    %s" % (url, e, dest))
+    if not _sha_ok(part, sha256):
+        os.remove(part)
+        die("the download's SHA-256 is not the expected one (%s): try again" % os.path.basename(dest))
+    os.replace(part, dest)
 
 
 def setup_zig():
@@ -114,8 +151,16 @@ def setup_sdl2():
     if not os.path.isdir(out):
         url = "https://github.com/libsdl-org/SDL/releases/download/release-%s/SDL2-devel-%s-mingw.zip" % (SDL_VER, SDL_VER)
         dest = os.path.join(TOOLS, "sdl2-mingw.zip")
+        # (a zip saved by hand under the name it has on the download page counts too)
+        by_hand = sorted(glob.glob(os.path.join(TOOLS, "SDL2-devel-*mingw*.zip")))
+        if by_hand and not os.path.isfile(dest):
+            dest = by_hand[-1]
         download(url, dest)
-        zipfile.ZipFile(dest).extractall(TOOLS)
+        try:
+            zipfile.ZipFile(dest).extractall(TOOLS)
+        except zipfile.BadZipFile:
+            os.remove(dest)
+            die("%s is not a complete zip (the download was cut off): it was removed, run this again" % dest)
         os.remove(dest)
     say("SDL2 (mingw):", sdl2_mingw())
 
