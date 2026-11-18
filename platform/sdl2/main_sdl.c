@@ -913,6 +913,20 @@ int main(int argc, char **argv) {
   setvbuf(stderr, NULL, _IOLBF, 0);
 #ifdef _WIN32
   winport_binary_files();
+  /* Started by a double-click (stderr is a console window or nowhere): what the game says goes to <save>/log.txt, the last run's kept as log-prev.txt,
+   * so a hang or a crash (a versus that stops, issue reports) leaves something to read. Started with its stderr sent somewhere (`2> log.txt`, a pipe) or
+   * with MT3DX_STDERR set, it is left alone. */
+  if (!getenv("MT3DX_STDERR")) {
+    const DWORD ft = GetFileType(GetStdHandle(STD_ERROR_HANDLE));
+    if (ft != FILE_TYPE_DISK && ft != FILE_TYPE_PIPE) {
+      char lp[1200], pp[1200];
+      snprintf(lp, sizeof lp, "%s/log.txt", P.save_dir);
+      snprintf(pp, sizeof pp, "%s/log-prev.txt", P.save_dir);
+      remove(pp);
+      rename(lp, pp);
+      if (freopen(lp, "w", stderr)) setvbuf(stderr, NULL, _IOLBF, 0);
+    }
+  }
 #endif
 
   SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1"); /* a pad works with the window behind another */

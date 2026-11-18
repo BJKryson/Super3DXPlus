@@ -82,7 +82,9 @@ simulating both cars from the same inputs) would remove both; it is not built.
 ## Measuring (for the netcode work)
 
 The log lines are off unless `MT3DX_NETLOG=1` is in the environment (a race writes hundreds of them); the behaviour they describe is always on. They go to
-stderr: `log.txt` on Windows (`play.bat`), `game.log` on the Pi, logcat on Android.
+stderr: `log.txt` on Windows, `game.log` on the Pi, logcat on Android. On Windows the player writes `<save folder>/log.txt` itself when it is started by a
+double-click or `play.bat` (the previous run's is kept as `log-prev.txt`, which is the one to send after a hang and a restart); started with its stderr sent
+somewhere (`2> log.txt`) or with `MT3DX_STDERR=1` set it leaves it alone. The versus' own events (joined, race, loaded, left) are in it without `MT3DX_NETLOG`.
 
 - `versus net: from pcb N: ...` every 2 s: the packets from that machine in the window, their **age in frames** (this machine's frame counter minus the packet's;
   with the clocks locked, the delay), the **gap** between arrivals, packets **lost** and **late**, and the **rtt** to the host (a PING each second, answered
