@@ -36,6 +36,8 @@ static struct {
   int seen;                /* bit i: force i has been seen playing (a driver that never says so is not asked again) */
   Uint32 reopen_t0;        /* the minute the reopenings are counted in */
   int reopens;
+  Uint32 alive_at;         /* when the forces were last sent again as a keepalive */
+  Uint32 zero_log;         /* when the steering force's change to or from nothing was last logged */
 } W = { .instance = -1, .rescan = 1, .fx_const = -1, .fx_spring = -1, .fx_damper = -1, .fx_sine = -1 };
 
 void wheel_init(const wheel_sink *sink) { W.sink = *sink; }
@@ -401,8 +403,22 @@ void wheel_frame(void) {
   const int hz = (int)o.vib_hz, gain = (int)(o.gain * 100.0f);
   const int FORCE_STEP = 330; /* 1 %: a change smaller than this is not sent (a wheel's bus is slow) */
   if (gain != W.s_gain && (W.caps & SDL_HAPTIC_GAIN)) SDL_HapticSetGain(W.h, gain < 1 ? 1 : gain), W.s_gain = gain;
-  if (abs(force - W.s_force) >= FORCE_STEP || (force == 0) != (W.s_force == 0)) {
-    W.e_const.constant.level = s16(o.force);
+  /* a keepalive (issue 2, a T300RS whose force went away while the driver still said it played): every half second the steering force is sent
+   * again and every effect is started again, and the steering force is never exactly 0 (a driver may park an effect at 0 and not wake it again) */
+  const Uint32 now = SDL_GetTicks();
+  const int alive = now - W.alive_at >= 500;
+  if (alive) {
+    W.alive_at = now;
+    const int ids[4] = { W.fx_const, W.fx_spring, W.fx_damper, W.fx_sine };
+    for (int i = 1; i < 4; ++i)
+      if (ids[i] >= 0) SDL_HapticRunEffect(W.h, ids[i], 1);
+    if (W.fx_const >= 0) SDL_HapticRunEffect(W.h, W.fx_const, 1);
+  }
+  if ((force == 0) != (W.s_force == 0)) { /* (what the driver is given at the changes to and from nothing, for the report) */
+    if (now - W.zero_log > 3000) W.zero_log = now, rlog("steering force %s", force == 0 ? "to nothing (sent as the smallest force)" : "back");
+  }
+  if (alive || abs(force - W.s_force) >= FORCE_STEP || (force == 0) != (W.s_force == 0)) {
+    W.e_const.constant.level = force == 0 ? 1 : s16(o.force);
     effect_update(W.fx_const, &W.e_const);
     W.s_force = force;
   }
