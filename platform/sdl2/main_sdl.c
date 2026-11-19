@@ -28,6 +28,7 @@
 #endif
 
 #include "app.h"
+#include "netdiag.h"
 #include "bind.h"
 #include "bgm.h"
 #include "gl.h"
@@ -53,6 +54,7 @@ static struct {
   input_ev ev[EV_MAX];
   int n_ev, quit, win_w, win_h, exit_req;
   int hud_touch; /* --hud touch: the race with the iPad's touch keys (hud_set_style) */
+  char log_file[1200]; /* the log this run writes (scrubbed at a clean exit) */
   volatile int cursor_hide; /* the game is in a race: the event thread hides the mouse pointer */
   volatile int fs_want, fs_now; /* the window mode the app wants (0 windowed, 1 fullscreen) and the one the window is in: the event thread switches it */
   int fs_cli;                    /* --fullscreen on the command line */
@@ -1060,8 +1062,10 @@ int main(int argc, char **argv) {
       char lp[1200], pp[1200];
       snprintf(lp, sizeof lp, "%s/log.txt", P.save_dir);
       snprintf(pp, sizeof pp, "%s/log-prev.txt", P.save_dir);
+      log_scrub_file(lp); /* (the last run's log, a crashed one too: no public address, room code or user name stays in it) */
       remove(pp);
       rename(lp, pp);
+      snprintf(P.log_file, sizeof P.log_file, "%s", lp);
       if (freopen(lp, "w", stderr)) setvbuf(stderr, NULL, _IOLBF, 0);
     }
   }
@@ -1293,6 +1297,10 @@ int main(int argc, char **argv) {
   SDL_WaitThread(P.game, NULL);
   if (P.audio) SDL_CloseAudioDevice(P.audio);
   SDL_Quit();
+  if (P.log_file[0]) { /* (the log closed and scrubbed of public addresses, room codes and user names: it is attached to bug reports) */
+    fflush(stderr);
+    if (freopen("NUL", "w", stderr)) log_scrub_file(P.log_file);
+  }
 #ifdef __linux__
   /* the console (the game run by its systemd service, as the Pi's: INVOCATION_ID) shuts down with EXIT; a player run by hand just closes */
   if (P.exit_req && getenv("INVOCATION_ID") && !getenv("MT3DX_NO_POWEROFF")) {
