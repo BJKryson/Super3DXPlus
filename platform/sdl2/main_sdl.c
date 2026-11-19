@@ -1108,10 +1108,29 @@ int main(int argc, char **argv) {
     if (SDL_GetDisplayUsableBounds(0, &area) == 0 && h > area.h * 92 / 100) h = area.h * 92 / 100, w = h * 4 / 3;
   }
   Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-  P.win = SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+  P.win = getenv("MT3DX_NOGL") ? NULL : SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags); /* (MT3DX_NOGL=1: test the no-driver message) */
   if (!P.win) {
-    fprintf(stderr, "no window: %s\n", SDL_GetError());
-    return 1;
+    /* the graphics driver offers no OpenGL ES (a virtual machine, a remote desktop, a very old or generic driver): try the EGL route (it finds an
+     * ANGLE next to the game, if one is there), then say what is wrong instead of just closing */
+    char first[256];
+    snprintf(first, sizeof first, "%s", SDL_GetError());
+    fprintf(stderr, "no window: %s\n", first);
+    if (getenv("MT3DX_NOGL")) SDL_setenv("SDL_VIDEO_EGL_DRIVER", "bogus_egl.dll", 1), snprintf(first, sizeof first, "test: no driver");
+    SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+    P.win = SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    if (!P.win) {
+      fprintf(stderr, "no window with EGL either: %s\n", SDL_GetError());
+      char msg[900];
+      snprintf(msg, sizeof msg,
+               "The game could not start: your graphics driver does not provide OpenGL ES (%s).\n\n"
+               "This usually means the graphics driver is missing or very old, or the game is running in a virtual machine or over remote desktop.\n\n"
+               "Please install the latest driver from your graphics card maker (AMD, NVIDIA or Intel) and try again. If it still fails, "
+               "attach log.txt from the game's folder to a GitHub issue.",
+               first);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Super3DX+", msg, NULL);
+      return 1;
+    }
+    fprintf(stderr, "window made through EGL\n");
   }
   /* OpenGL ES 3 where there is, else 2 */
   static const int versions[2][2] = { { 3, 0 }, { 2, 0 } };
@@ -1122,6 +1141,11 @@ int main(int argc, char **argv) {
   }
   if (!P.ctx) {
     fprintf(stderr, "no OpenGL ES context: %s\n", SDL_GetError());
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Super3DX+",
+                             "The game could not start: your graphics driver refused to create an OpenGL ES context.\n\n"
+                             "Please install the latest driver from your graphics card maker (AMD, NVIDIA or Intel) and try again. If it still fails, "
+                             "attach log.txt from the game's folder to a GitHub issue.",
+                             NULL);
     return 1;
   }
 #ifdef WMMT_WIN
