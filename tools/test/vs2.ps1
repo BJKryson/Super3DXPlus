@@ -8,9 +8,9 @@ param([string]$Exe = '', [string]$Data = '', [int]$Players = 2, [int]$Expect = 0
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not $Exe) { $Exe = Join-Path $repo 'build\windows\super3dx.exe' }
 if (-not $Data) { $Data = Join-Path $repo 'data' }
-$exe = Split-Path $Exe -Parent; $exeName = $Exe; $data = $Data
+$exeName = $Exe; $exeDir = Split-Path $Exe -Parent; $data = $Data # (PowerShell's names ignore case: $exe would have overwritten $Exe)
 $runs = Join-Path $repo 'build\test-runs'
-Set-Location $exe
+Set-Location $exeDir
 if (-not $ClientShots) { $ClientShots = $Shots }
 $procs = @()
 $roles = @('host', 'client', 'client2')[0..($Players - 1)]

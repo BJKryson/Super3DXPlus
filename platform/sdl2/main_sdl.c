@@ -51,6 +51,7 @@ static struct {
   input_ev ev[EV_MAX];
   int n_ev, quit, win_w, win_h, exit_req;
   int hud_touch; /* --hud touch: the race with the iPad's touch keys (hud_set_style) */
+  volatile int cursor_hide; /* the game is in a race: the event thread hides the mouse pointer */
   volatile int fs_want, fs_now; /* the window mode the app wants (0 windowed, 1 fullscreen) and the one the window is in: the event thread switches it */
   int fs_cli;                    /* --fullscreen on the command line */
   volatile int resized; /* the window changed size: the game thread tells the app (app_resize) between frames */
@@ -652,6 +653,7 @@ static int game(void *arg) {
     }
     app_frame(dt);
     P.fs_want = app_fullscreen();
+    P.cursor_hide = app_racing();
     pad_rumble_frame();
     wheel_frame(); /* (a wheel's forces, wheel.c) */
     /* the attract loop's movies (movie.c: data_dir/intro.wmv, playdemo.wmv, tutorial.wmv); one that is not there ends at once */
@@ -1185,6 +1187,10 @@ int main(int argc, char **argv) {
       P.fs_now = P.fs_want;
       fprintf(stderr, "window mode: %s\n", P.fs_now ? "fullscreen" : "windowed");
       SDL_SetWindowFullscreen(P.win, P.fs_now ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    }
+    {
+      static int shown = 1;
+      if (P.cursor_hide == shown) shown = !P.cursor_hide, SDL_ShowCursor(shown ? SDL_ENABLE : SDL_DISABLE); /* (the pointer out of the way in a race) */
     }
     if (!SDL_WaitEventTimeout(&e, 50)) continue;
     switch (e.type) {

@@ -118,3 +118,7 @@ somewhere (`2> log.txt`) or with `MT3DX_STDERR=1` set it leaves it alone. The ve
 
 Test helpers: `tools/test/vs2.ps1` runs two players on one PC (host and client, both driving themselves, shots and logs per player);
 `MT3DX_VSAUTO=host[:n]|join`, `MT3DX_GOTO=36` (the versus screen) and `MT3DX_VSKM=<km>` (a shorter race) are what it sets.
+
+## Ping on the HUD
+
+Every race packet carries its sender's round trip to the host after the car link packet (two bytes, ms; 0xffff not measured yet). The HUD shows it as P: n under each rival's ADVANTAGE, coloured green below 75 ms, yellow to 120, orange to 200, red above. Hosts and servers relay the packet whole; vs_host.c accepts the two extra bytes (a host from before them drops the packets of a newer client).
