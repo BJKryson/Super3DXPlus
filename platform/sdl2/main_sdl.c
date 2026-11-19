@@ -435,6 +435,100 @@ static void crt_present(int win_w, int win_h) {
 }
 
 
+/* The BLACK LEVEL option (the PC player): the frame drawn into a texture of the drawing's size and put on the window through a
+ * levels curve, black point b up and white point 1 - 1.25 b, so a display or driver that lifts the blacks (a limited range
+ * RGB signal on a full range monitor, an Auto HDR or colour "enhancement" setting) can be undone from inside the game. Level 5
+ * is the 16..235 of a limited range signal. Off (0): the game draws straight to the window and none of this runs. */
+static struct {
+  int w, h;
+  GLuint fbo, tex, rb, prog, vbo;
+  GLint u_k;
+} LV;
+
+static void lv_ensure(int w, int h) {
+  if (!LV.fbo) {
+    glGenTextures(1, &LV.tex);
+    glGenRenderbuffers(1, &LV.rb);
+    glGenFramebuffers(1, &LV.fbo);
+    GLuint vs = crt_shader(GL_VERTEX_SHADER,
+      "attribute vec2 p; varying vec2 uv;\n"
+      "void main() { uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }\n");
+    GLuint fs = crt_shader(GL_FRAGMENT_SHADER,
+      "precision mediump float; uniform sampler2D t; uniform vec2 k; varying vec2 uv;\n"
+      "void main() { gl_FragColor = vec4(clamp((texture2D(t, uv).rgb - k.x) * k.y, 0.0, 1.0), 1.0); }\n");
+    LV.prog = glCreateProgram();
+    glAttachShader(LV.prog, vs);
+    glAttachShader(LV.prog, fs);
+    glBindAttribLocation(LV.prog, 0, "p");
+    glLinkProgram(LV.prog);
+    LV.u_k = glGetUniformLocation(LV.prog, "k");
+    static const float quad[8] = { -1, -1, 1, -1, -1, 1, 1, 1 };
+    glGenBuffers(1, &LV.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, LV.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof quad, quad, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+  if (LV.w == w && LV.h == h) return;
+  glBindTexture(GL_TEXTURE_2D, LV.tex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindRenderbuffer(GL_RENDERBUFFER, LV.rb);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
+  glBindFramebuffer(GL_FRAMEBUFFER, LV.fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, LV.tex, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, LV.rb);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, LV.rb);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) fprintf(stderr, "levels: the framebuffer is incomplete\n");
+  LV.w = w, LV.h = h;
+}
+
+/* the frame in the texture onto the window's bottom left w x h (the game's GL state is put back after) */
+static void lv_present(int level, int w, int h, int win_w, int win_h) {
+  GLint prog, abuf, vao, tex, vp[4], act;
+  GLboolean blend, depth, stencil, cull, scissor, dither;
+  glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+  glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &abuf);
+  glGetIntegerv(0x85B5 /* GL_VERTEX_ARRAY_BINDING_OES */, &vao);
+  glGetIntegerv(GL_ACTIVE_TEXTURE, &act);
+  glActiveTexture(GL_TEXTURE0);
+  glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex);
+  glGetIntegerv(GL_VIEWPORT, vp);
+  blend = glIsEnabled(GL_BLEND), depth = glIsEnabled(GL_DEPTH_TEST), stencil = glIsEnabled(GL_STENCIL_TEST);
+  cull = glIsEnabled(GL_CULL_FACE), scissor = glIsEnabled(GL_SCISSOR_TEST), dither = glIsEnabled(GL_DITHER);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, win_w, win_h);
+  glDisable(GL_BLEND), glDisable(GL_DEPTH_TEST), glDisable(GL_STENCIL_TEST), glDisable(GL_CULL_FACE), glDisable(GL_SCISSOR_TEST), glDisable(GL_DITHER);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glClearColor(0, 0, 0, 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glViewport(0, 0, w, h);
+  float b = (float)level * 0.0125f, white = 1.0f - 1.25f * b;
+  glBindVertexArrayOES(0);
+  glUseProgram(LV.prog);
+  glUniform2f(LV.u_k, b, 1.0f / (white - b));
+  glBindTexture(GL_TEXTURE_2D, LV.tex);
+  glBindBuffer(GL_ARRAY_BUFFER, LV.vbo);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  glDisableVertexAttribArray(0);
+  glBindTexture(GL_TEXTURE_2D, (GLuint)tex);
+  glActiveTexture((GLenum)act);
+  glBindBuffer(GL_ARRAY_BUFFER, (GLuint)abuf);
+  glBindVertexArrayOES((GLuint)vao);
+  glUseProgram((GLuint)prog);
+  glViewport(vp[0], vp[1], vp[2], vp[3]);
+  if (blend) glEnable(GL_BLEND);
+  if (depth) glEnable(GL_DEPTH_TEST);
+  if (stencil) glEnable(GL_STENCIL_TEST);
+  if (cull) glEnable(GL_CULL_FACE);
+  if (scissor) glEnable(GL_SCISSOR_TEST);
+  if (dither) glEnable(GL_DITHER);
+}
+
 static int game(void *arg) {
   (void)arg;
   if (SDL_GL_MakeCurrent(P.win, P.ctx) != 0) {
@@ -459,6 +553,14 @@ static int game(void *arg) {
   if (sw != 0 && interval != 1) interval = 1, sw = SDL_GL_SetSwapInterval(1);
   fprintf(stderr, "swap interval: asked %d, set %s, now %d\n", interval, sw == 0 ? "ok" : SDL_GetError(), SDL_GL_GetSwapInterval());
   app_save_dir(P.save_dir);
+  { /* what the window got (a washed out picture report: the bits of its buffer, its display's pixel format) */
+    int rb = 0, gb = 0, bb = 0, ab = 0;
+    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &rb), SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &gb);
+    SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &bb), SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &ab);
+    SDL_DisplayMode dm;
+    int dok = SDL_GetWindowDisplayMode(P.win, &dm) == 0;
+    fprintf(stderr, "framebuffer: %d%d%d%d bits, display format %s\n", rb, gb, bb, ab, dok ? SDL_GetPixelFormatName(dm.format) : "?");
+  }
   app_console(); /* a machine that can draw the maps far */
   /* The phone's extras (multisampled half-float 3D, bloom, 16x anisotropic) are on for a desktop PC. A CRT's 480 lines or a
    * Pi's GPU have no use for them (and a software renderer cannot pay for them): off there, unless MT3DX_HQ=1; MT3DX_HQ=0
@@ -535,7 +637,10 @@ static int game(void *arg) {
     double now = now_s();
     float dt = last > 0 ? (float)(now - last) : 1.0f / 60.0f;
     last = now;
-    glBindFramebuffer(GL_FRAMEBUFFER, CRT.on ? CRT.fbo : 0);
+    int level = CRT.on ? 0 : app_black_level();
+    if (getenv("MT3DX_BLACK")) level = atoi(getenv("MT3DX_BLACK")); /* test: this black level */
+    if (level > 0) lv_ensure(fb_w, fb_h);
+    glBindFramebuffer(GL_FRAMEBUFFER, CRT.on ? CRT.fbo : level > 0 ? LV.fbo : 0);
     if (getenv("MT3DX_TAP")) tap_check(now - run0);
     if (getenv("MT3DX_SCRIPT")) script_check(now - run0);
     if (getenv("MT3DX_AUTODRIVE") && app_racing()) { /* tests: the accelerator held in a race, the brake from MT3DX_BRAKE_AT s of the run on */
@@ -587,7 +692,8 @@ static int game(void *arg) {
       if (strcmp(now, last)) fprintf(stderr, "bgm playing: %s\n", now), snprintf(last, sizeof last, "%s", now);
     }
     bgm_level(app_bgm_level());
-    if (movie_active()) movie_draw(CRT.on ? fb_w : P.win_w, CRT.on ? fb_h : P.win_h); /* (over the frame, in the texture the CRT pass takes) */
+    if (movie_active()) movie_draw(CRT.on || level > 0 ? fb_w : P.win_w, CRT.on || level > 0 ? fb_h : P.win_h); /* (over the frame, in the texture the CRT pass takes) */
+    if (level > 0 && !CRT.on) lv_present(level, fb_w, fb_h, P.win_w, P.win_h); /* (before the shot: it sees what the window gets) */
     if (getenv("MT3DX_SHOT")) shot_check(now_s() - run0); /* (the movie too; in the CRT mode the game's own 640x480) */
     if (CRT.on) crt_present(P.win_w, P.win_h);
     double p0 = now_s();
