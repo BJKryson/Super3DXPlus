@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
+#include <windows.h>
+#include <shellapi.h>
 #endif
 
 #include "app.h"
@@ -530,6 +532,23 @@ static void lv_present(int level, int w, int h, int win_w, int win_h) {
   if (dither) glEnable(GL_DITHER);
 }
 
+#ifdef _WIN32
+/* Windows asks "allow this program through the firewall?" once, when it first listens, and remembers a No (a block rule, no second prompt): friends then cannot join a
+ * hosted game. This removes the program's rules and adds allow rules for it (UDP and TCP, every profile) in an elevated command window: Windows shows its own
+ * administrator prompt, and the player says Yes there. */
+static void firewall_repair(void) {
+  char exe[MAX_PATH];
+  if (!GetModuleFileNameA(NULL, exe, sizeof exe)) return;
+  char args[1800];
+  snprintf(args, sizeof args,
+           "/c netsh advfirewall firewall delete rule name=all program=\"%s\" & "
+           "netsh advfirewall firewall add rule name=\"Super3DX+ (UDP)\" dir=in action=allow program=\"%s\" protocol=udp profile=any enable=yes & "
+           "netsh advfirewall firewall add rule name=\"Super3DX+ (TCP)\" dir=in action=allow program=\"%s\" protocol=tcp profile=any enable=yes",
+           exe, exe, exe);
+  HINSTANCE r = ShellExecuteA(NULL, "runas", "cmd.exe", args, NULL, SW_HIDE);
+  fprintf(stderr, "firewall: asked Windows to allow %s (%s)\n", exe, (INT_PTR)r > 32 ? "prompt shown" : "refused or cancelled");
+}
+#endif
 static int game(void *arg) {
   (void)arg;
   if (SDL_GL_MakeCurrent(P.win, P.ctx) != 0) {
@@ -591,6 +610,9 @@ static int game(void *arg) {
   if (P.fs_cli) app_set_fullscreen(1); /* (the command line over the saved mode) */
 #if !defined(__aarch64__) && !defined(__arm__)
   if (!CRT.on) app_window_row(1); /* the game options get a WINDOW MODE row (the Pi's kiosk has no windows) */
+#ifdef _WIN32
+  app_firewall_row(1); /* (the versus lobby's ALLOW THROUGH FIREWALL) */
+#endif
 #endif
   bgm_init(P.data_dir);
   audio_open();
@@ -653,6 +675,9 @@ static int game(void *arg) {
     }
     app_frame(dt);
     P.fs_want = app_fullscreen();
+#ifdef _WIN32
+    if (app_firewall_ask()) firewall_repair();
+#endif
     P.cursor_hide = app_racing();
     pad_rumble_frame();
     wheel_frame(); /* (a wheel's forces, wheel.c) */
