@@ -6,7 +6,9 @@ This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3D
 - Android
 - Raspberry Pi
 
-Showcase video: https://www.youtube.com/watch?v=WwAjkctDoF4
+Showcase videos: 
+https://www.youtube.com/watch?v=WwAjkctDoF4 (Solo play)
+https://www.youtube.com/watch?v=_sUFo9nlgWI (Online VS)
 
 ## Copyright disclaimer
 
