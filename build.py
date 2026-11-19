@@ -165,6 +165,9 @@ def setup_sdl2():
     say("SDL2 (mingw):", sdl2_mingw())
 
 
+ANGLE_DLLS = ["libEGL.dll", "libGLESv2.dll"]
+
+
 def sdl2_mingw():
     if os.environ.get("SDL2_DIR"):
         return os.environ["SDL2_DIR"]
@@ -349,6 +352,8 @@ def build_exe(target, cc, opt, jobs):
     run(cmd, cwd=ROOT)
     if win:
         shutil.copyfile(os.path.join(sdl2_mingw(), "bin", "SDL2.dll"), os.path.join(out, "SDL2.dll"))
+        for f in ANGLE_DLLS:  # the OpenGL ES fallback for PCs whose driver has none (third_party/angle)
+            shutil.copyfile(os.path.join(ROOT, "third_party", "angle", f), os.path.join(out, f))
     say("built", exe)
     return exe
 
@@ -368,6 +373,8 @@ def package(target):
     shutil.copy(exe, pk)
     if target == "windows":
         shutil.copy(os.path.join(out, "SDL2.dll"), pk)
+        for f in ANGLE_DLLS:
+            shutil.copy(os.path.join(out, f), pk)
         open(os.path.join(pk, "play.bat"), "w", newline="\r\n").write(
             '@echo off\nrem Optional: super3dx.exe can be double-clicked as it is. This one adds options, e.g. play.bat --size 1600x1200 (the layout is 4:3); saves go to the save folder.\n'
             'cd /d "%~dp0"\nif not exist save mkdir save\nsuper3dx.exe "%~dp0data" --save "%~dp0save" %*\n')
@@ -682,7 +689,7 @@ def wizard(folder, opt, jobs, full=False):
     built = os.path.join(ROOT, "build", target)
     if can_update:
         try:
-            for f in ([exe_name, "SDL2.dll"] if target == "windows" else [exe_name]):
+            for f in ([exe_name, "SDL2.dll"] + ANGLE_DLLS if target == "windows" else [exe_name]):
                 shutil.copy2(os.path.join(built, f), os.path.join(dest, f))
         except PermissionError:
             say("\nThe game could not be updated because a file is in use: close the game (and any window showing that folder) and run setup again.")

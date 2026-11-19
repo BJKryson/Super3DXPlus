@@ -1115,7 +1115,7 @@ int main(int argc, char **argv) {
     char first[256];
     snprintf(first, sizeof first, "%s", SDL_GetError());
     fprintf(stderr, "no window: %s\n", first);
-    if (getenv("MT3DX_NOGL")) SDL_setenv("SDL_VIDEO_EGL_DRIVER", "bogus_egl.dll", 1), snprintf(first, sizeof first, "test: no driver");
+    if (getenv("MT3DX_NOGL")) snprintf(first, sizeof first, "test: no driver"), atoi(getenv("MT3DX_NOGL")) == 2 ? SDL_setenv("SDL_VIDEO_EGL_DRIVER", "bogus_egl.dll", 1) : 0; /* (2: and no ANGLE either) */
     SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
     P.win = SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
     if (!P.win) {
