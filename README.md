@@ -43,7 +43,7 @@ Run **`setup-pi.bat`** / `./setup-pi.sh` to build and install the game on a Rasp
 
 **Updating to a new version** (no full rebuild needed)
 
-1. Get the new code: in a git checkout, `git pull` (the setup also offers to do it for you); otherwise download the new ZIP and unzip it **over** the old folder, replacing files when asked. Your finished game folders (`Super3DXPlus-Export`, `Super3DXPlus-JP`), your saves and the tools the setup downloaded (`.super3dx`) are not in the ZIP, so they stay.
+1. Get the new code: just run `setup.bat` (or `./setup.sh`). It checks GitHub first and, if there is a newer version, offers to install it: with `git pull` in a git checkout, or by downloading the latest files and replacing the ones that differ (the old copies are kept in `build/update-backup/`). `setup.bat update` only does that check. Your finished game folders (`Super3DXPlus-Export`, `Super3DXPlus-JP`), your saves and the tools the setup downloaded (`.super3dx`) are never touched. (Unzipping a new ZIP over the old folder still works too.)
 2. Run **`setup.bat`** (or `./setup.sh`) again and give it the same game folder. It recognises your earlier build and tells you what it will do:
    - **Most updates (game code, menus, fixes):** it only rebuilds the game program, in a few minutes. Your converted data and saves are not touched.
    - **When the data converters changed** (the changelog says so): it converts the data again (about an hour) and copies your saves into the new build.

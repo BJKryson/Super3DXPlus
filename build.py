@@ -2,6 +2,7 @@
 """Builds the player. One script for Windows, Linux (also the Raspberry Pi) and macOS: Python 3.9+ and a C compiler, no WSL.
 
     python build.py                              the guided setup: installs what it can, asks where your game is, builds, says where it is
+    python build.py update                       check GitHub for a newer version and install it (the guided setup does this first, too)
     python build.py doctor                       what is installed, what is missing and how to get it
     python build.py data <arcade root>           gen + convert: the tables, the recompiled physics and the game's data (data/)
     python build.py exe [--target T] [--cc CC]   the player: build/<target>/super3dx[.exe]
@@ -541,15 +542,63 @@ def write_info(folder, md5, region, game=None):
               open(os.path.join(folder, "build-info.json"), "w", encoding="utf-8"), indent=1)
 
 
-def offer_git_pull():
-    """for a git checkout: offer to fetch the latest sources first"""
-    if not (which("git") and os.path.isdir(os.path.join(ROOT, ".git"))):
-        return
-    if not yes("\nThis folder is a git checkout. Download the latest version from GitHub first?"):
-        return
-    r = subprocess.run(["git", "pull", "--ff-only"], cwd=ROOT)
-    if r.returncode:
-        say("\nCould not update automatically (you probably have changes of your own in this folder). Carrying on with what is here.")
+def _get_json(url):
+    """the JSON at a URL (the GitHub API), or None; Python's own HTTPS first, then the system's downloader (see _fetch_with_system_tool)"""
+    import json, tempfile
+    req = urllib.request.Request(url, headers={"User-Agent": "Super3DXPlus-setup", "Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except (OSError, ValueError):
+        pass
+    part = os.path.join(tempfile.gettempdir(), "super3dx-api.json")
+    try:
+        if _fetch_with_system_tool(url, part):
+            return json.load(open(part, encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _soft_download(url, dest):
+    """a download that reports failure instead of stopping the setup"""
+    say("downloading", url)
+    part = dest + ".part"
+    try:
+        with urllib.request.urlopen(url, timeout=120) as r, open(part, "wb") as f:
+            shutil.copyfileobj(r, f)
+        os.replace(part, dest)
+        return True
+    except OSError:
+        pass
+    if _fetch_with_system_tool(url, part):
+        os.replace(part, dest)
+        return True
+    return False
+
+
+def self_update():
+    """look for a newer version on GitHub and offer to install it (tools/updater.py); if the setup's own files changed, run the new ones"""
+    import updater
+    mine = ["build.py", "tools/setupkit.py", "tools/updater.py"]
+    before = {m: open(os.path.join(ROOT, m), "rb").read() for m in mine}
+    r = updater.check(ROOT, say, yes, which, _get_json, _soft_download)
+    if r == "updated" and updater.self_changed(ROOT, before):
+        say("\nThe setup itself was updated: starting the new one.\n")
+        env = dict(os.environ, SUPER3DX_NO_UPDATE="1")  # (no second check)
+        sys.exit(subprocess.call([sys.executable, os.path.abspath(__file__)] + sys.argv[1:], env=env))
+    return r
+
+
+def last_game():
+    """the game folder an earlier build here was made from (build-info.json), if it is still there: the newest of them"""
+    found = []
+    for f in glob.glob(os.path.join(ROOT, "Super3DXPlus-*", "build-info.json")):
+        info = read_info(os.path.dirname(f))
+        g = info and info.get("game_dir")
+        if g and os.path.isdir(g) and find_game(g):
+            found.append((info.get("built", ""), g))
+    return [g for _, g in sorted(found, reverse=True)]
 
 
 def refresh(game, target, opt, jobs):
@@ -566,6 +615,7 @@ def wizard(folder, opt, jobs, full=False):
             stream.reconfigure(errors="replace")
         except Exception:
             pass
+    self_update()
     problem = preflight()
     if problem and problem.startswith("WARN:"):
         say("\nNote: " + problem[5:])
@@ -578,7 +628,6 @@ def wizard(folder, opt, jobs, full=False):
     say("Super3DX+ setup")
     say("This builds the game from YOUR OWN copy of Wangan Midnight Maximum Tune 3DX+. It needs an internet connection for a few small")
     say("downloads, about 15 GB of free disk space, and takes an hour or more. You can leave it alone while it works.")
-    offer_git_pull()
     free = shutil.disk_usage(ROOT).free / 2**30
     if free < 15:
         say("\nWARNING: only %.0f GB free on this drive; the build needs about 15 GB." % free)
@@ -625,6 +674,11 @@ def wizard(folder, opt, jobs, full=False):
     step(2, total, "find your copy of the game")
     say("I need the folder that holds your copy of the game: it has a file called `main` and a folder called `data` inside.")
     game = find_game(folder) if folder else None
+    if not game and not folder:
+        for g in last_game()[:1]:  # (asked once: the same copy of the game as the last build)
+            say("Your last build here used this game folder:\n    " + g)
+            if yes("Use it again?"):
+                game = find_game(g)
     while not game:
         if folder:
             say("\nNo `main` file and `data` folder found in: %s" % folder)
@@ -755,7 +809,7 @@ def _guided(which_one, jobs):
 def main():
     os.environ["PYTHONUTF8"] = "1"  # every Python tool this starts reads and writes UTF-8 (the Windows default, cp1252, cannot hold the Japanese text)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "pi", "android", "gensrc", "refresh", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
+    ap.add_argument("cmd", nargs="?", default="wizard", choices=["wizard", "update", "pi", "android", "gensrc", "refresh", "doctor", "setup-zig", "setup-sdl2", "data", "exe", "package", "all"])
     ap.add_argument("arcade", nargs="?", help="the arcade dump: a folder with main and data/ (for data, all and wizard)")
     ap.add_argument("--target", choices=["windows", "linux", "pi"], default="windows" if os.name == "nt" else "linux")
     ap.add_argument("--cc", help="the C compiler command to use (e.g. 'zig cc -target x86_64-windows-gnu')")
@@ -782,6 +836,8 @@ def main():
             say("\n" + "!" * 78 + "\nThe setup hit an unexpected problem (it is a bug in the setup, not your fault).\n"
                 "Please open an issue at %s and attach this file:\n\n    %s\n" % (ISSUES, err) + "!" * 78)
             sys.exit(1)
+    if a.cmd == "update":
+        sys.exit(0 if self_update() != "failed" else 1)
     if a.cmd == "gensrc":
         if not a.arcade:
             die("gensrc needs the arcade dump folder")

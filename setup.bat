@@ -32,11 +32,10 @@ if not defined PY (
 )
 
 :run
-if "%~1"=="" goto wiz
-%PY% build.py %*
-goto done
-:wiz
-%PY% build.py wizard
-:done
-echo.
-pause
+rem updater-safe: from here the rest of this file is read as one block, so the setup can replace this file (a new version) while it runs.
+(
+  if "%~1"=="" (%PY% build.py wizard) else (%PY% build.py %*)
+  echo.
+  pause
+  exit /b
+)

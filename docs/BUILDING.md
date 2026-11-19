@@ -18,7 +18,7 @@ To build the other version too, run it again and pick the other game folder.
 **Updating.** After a new version of Super3DX+ (`git pull` in a checkout, or a new ZIP copied over the old folder, keeping your `Super3DXPlus-*` folders and `.super3dx`),
 run the setup again. Each finished build carries a `build-info.json` (a fingerprint of the data tools, the game's `main`, the date and the source commit). If the data
 tools have not changed it only regenerates the sources and rebuilds the player (a few minutes) and leaves the data and `save/` alone; if they changed, it converts the data
-again (about an hour) and copies your saves into the new build. `python build.py wizard --full` forces a complete rebuild. In a git checkout the setup also offers to `git pull` first.
+again (about an hour) and copies your saves into the new build. `python build.py wizard --full` forces a complete rebuild. The setup checks GitHub for a newer version first (`python build.py update` does only that; `SUPER3DX_NO_UPDATE=1` skips it): in a git checkout it offers `git pull`, otherwise it downloads the latest files and replaces the ones that differ, keeping the old copies in `build/update-backup/` (`tools/updater.py`). If the setup's own files changed it restarts itself, and it remembers the game folder of your last build.
 
 **Raspberry Pi and Android.** Run `setup-pi.bat` / `./setup-pi.sh` and `setup-android.bat` / `./setup-android.sh` after the main setup (below). Everything it prints is also saved in `build/logs/setup-<date>.txt`; if it
 stops, it says in plain words what probably happened and what to do. If you ask for help, attach that file.
