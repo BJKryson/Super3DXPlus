@@ -675,9 +675,14 @@ static int game(void *arg) {
     }
     app_frame(dt);
     P.fs_want = app_fullscreen();
+    {
+      int act = app_net_act(); /* the network options' buttons */
+      if (act == 3) SDL_SetClipboardText(app_net_diag());
 #ifdef _WIN32
-    if (app_firewall_ask()) firewall_repair();
+      if (act == 1) firewall_repair();
+      if (act == 2) ShellExecuteA(NULL, "open", app_save_folder(), NULL, NULL, SW_SHOWNORMAL); /* (log.txt is in it) */
 #endif
+    }
     P.cursor_hide = app_racing();
     pad_rumble_frame();
     wheel_frame(); /* (a wheel's forces, wheel.c) */
