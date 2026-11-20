@@ -9,6 +9,8 @@ What Super3DX+ adds or changes compared with [Re3DX+](NOTICE.md). Longer explana
 - Controller vibration (wall hits, expansion joints, tyre slip) with adjustable strength
 - TOUCH LAYOUT (the touch controls' screen, formerly KEY LAYOUT, issue 18): besides the three groups of touch keys, the race's gauges can be dragged and resized: the dials, the speed plate, the gear shifter, the rank and distance, the time left, the map and the rival info (50% to 200%, about their own middle; a console left alone stays exactly where it was). The arcade-style HUD is untouched.
 - CAMERA SHAKE (in the game settings): smooths out the view's shake at speed and over rough road, 0% to 100%
+- NETWORK OPTIONS shows how the last host or join attempt went (no answer, version mismatch, host closed...) instead of "not connected"; the same line goes to the log
+- Windows: the game asks laptops with two graphics cards to use the fast one (NVIDIA Optimus and AMD switchable graphics; Windows' Graphics settings can still override it)
 - Steering wheel support (untested on hardware): wheel axes and buttons are bindable, and force feedback (steering pull, centering, damping, road effects) through SDL haptic, with a WHEEL list in KEY BINDINGS for the device and gains
 - Rebuilt main menu flow: PLAY / SETTINGS / EXIT, then car selection, then Solo / Versus / Car settings
 - Stock, Full Tune and Hell's Tuning starting points (Hell's Tuning begins the story on Ch. 101)

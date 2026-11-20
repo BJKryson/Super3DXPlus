@@ -71,6 +71,12 @@ static void pad_rumble_frame(void);
 #ifdef WMMT_WIN
 int gl_load(void); /* build.py's generated lookup of the GL functions */
 #endif
+#ifdef WMMT_WIN
+/* Laptops with two GPUs: the drivers' own switch (NVIDIA Optimus, AMD PowerXpress) reads these two exports and runs the game on the fast card instead
+ * of the integrated one (issue 28). Windows' Settings > System > Display > Graphics can still override it per app. */
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+#endif
 #ifdef _WIN32
 #define setenv(k, v, overwrite) ((overwrite) || !getenv(k) ? _putenv_s(k, v) : 0)
 #endif
