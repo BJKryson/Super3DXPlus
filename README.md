@@ -43,8 +43,8 @@ Run **`setup-pi.bat`** / `./setup-pi.sh` to build and install the game on a Rasp
 
 **Updating to a new version** (no full rebuild needed)
 
-1. Get the new code: just run `setup.bat` (or `./setup.sh`). It checks GitHub first and, if there is a newer version, offers to install it: with `git pull` in a git checkout, or by downloading the latest files and replacing the ones that differ (the old copies are kept in `build/update-backup/`). `setup.bat update` only does that check. Your finished game folders (`Super3DXPlus-Export`, `Super3DXPlus-JP`), your saves and the tools the setup downloaded (`.super3dx`) are never touched. (Unzipping a new ZIP over the old folder still works too.)
-2. Run **`setup.bat`** (or `./setup.sh`) again and give it the same game folder. It recognises your earlier build and tells you what it will do:
+1. Run **`setup.bat`** (or `./setup.sh`). It first checks GitHub and, if there is a newer version, offers to install it: with `git pull` in a git checkout, or by downloading the latest files and replacing the ones that differ (the old copies are kept in `build/update-backup/`; unzipping a new ZIP over the old folder works too). `setup.bat update` does only that check. Your finished game folders (`Super3DXPlus-Export`, `Super3DXPlus-JP`), your saves and the tools the setup downloaded (`.super3dx`) are never touched.
+2. The same run then carries on and rebuilds. It remembers the game folder of your last build (it asks once whether to use it again), recognises your earlier build and tells you what it will do:
    - **Most updates (game code, menus, fixes):** it only rebuilds the game program, in a few minutes. Your converted data and saves are not touched.
    - **When the data converters changed** (the changelog says so): it converts the data again (about an hour) and copies your saves into the new build.
 3. For the Raspberry Pi or Android, run `setup-pi` / `setup-android` again afterwards. The Pi script only re-sends data that changed; the Android script rebuilds the app in a few minutes, and installing it over the old one keeps your saves (as long as you keep the signing key in `.super3dx/android/debug.keystore`).
