@@ -466,17 +466,69 @@ def ensure_modules():
     sys.exit(subprocess.run([py] + sys.argv).returncode)  # carry on inside it
 
 
-def find_ffmpeg():
-    p = os.environ.get("FFMPEG") or which("ffmpeg")
-    if p:
-        return p
-    if os.name == "nt":  # a winget install in this very session is not on this process's PATH yet
-        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet")
-        for pat in (os.path.join(base, "Links", "ffmpeg.exe"), os.path.join(base, "Packages", "Gyan.FFmpeg*", "**", "bin", "ffmpeg.exe")):
-            m = glob.glob(pat, recursive=True)
-            if m:
-                return m[0]
+def ffmpeg_problem(path):
+    """None if this ffmpeg runs and has the Bink video decoder the arcade's movies need, else what is wrong with it"""
+    try:
+        r = subprocess.run([path, "-hide_banner", "-decoders"], capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        return "the file does not exist or cannot be started"
+    except (OSError, subprocess.SubprocessError) as e:
+        return "it did not run (%s)" % e
+    if r.returncode:
+        return "it ran but failed (exit code %d)" % r.returncode
+    if "bink" not in r.stdout.lower():
+        return "it has no Bink decoder (a 'full' build is needed, not an 'essentials' one)"
     return None
+
+
+def find_ffmpeg():
+    """the first ffmpeg that works: FFMPEG, the PATH, the setup's own copy, a winget install (not on this process's PATH yet if it was made in this session)"""
+    cands = [os.environ.get("FFMPEG"), which("ffmpeg")]
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    cands += glob.glob(os.path.join(TOOLS, "ffmpeg", "**", exe), recursive=True)
+    if os.name == "nt":
+        base = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet")
+        cands.append(os.path.join(base, "Links", "ffmpeg.exe"))
+        cands += glob.glob(os.path.join(base, "Packages", "Gyan.FFmpeg*", "**", "bin", "ffmpeg.exe"), recursive=True)
+    for c in cands:
+        if not c:
+            continue
+        why = ffmpeg_problem(c)
+        if not why:
+            return c
+        say("ffmpeg at %s will not do: %s" % (c, why))
+    return None
+
+
+# a pinned 'full' build (it has the Bink decoder), Gyan's own GitHub release: its SHA-256 as GitHub lists it for the asset
+FFMPEG_ZIP = ("https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-full_build.zip",
+              "759d0a9831c436a0eb331ad36f236c06cb04aaa0005da46571f0e9d3d9206f6b")
+
+
+def setup_ffmpeg():
+    """a portable ffmpeg (Windows), kept in .super3dx/ffmpeg: the pinned download, its SHA-256 checked. None if it could not be had"""
+    if os.name != "nt":
+        return None
+    url, sha = FFMPEG_ZIP
+    dest = os.path.join(TOOLS, os.path.basename(url))
+    out = os.path.join(TOOLS, "ffmpeg")
+    try:
+        download(url, dest, sha)  # (stops the setup with its own message when it cannot)
+    except SystemExit as e:
+        say(str(e))
+        return None
+    try:
+        shutil.rmtree(out, ignore_errors=True)
+        zipfile.ZipFile(dest).extractall(out)
+    except (zipfile.BadZipFile, OSError) as e:
+        say("could not unpack it (%s)" % e)
+        return None
+    finally:
+        try:
+            os.remove(dest)
+        except OSError:
+            pass
+    return find_ffmpeg()
 
 
 def preflight():
@@ -663,11 +715,13 @@ def wizard(folder, opt, jobs, full=False):
             say("then run this again.")
             return 1
     ff = find_ffmpeg()
-    if not ff and os.name == "nt" and which("winget"):
-        say("\nffmpeg (it converts the game's sound and movies) is not installed.")
-        if yes("Install it now with winget? (a normal Windows installer; it may ask for permission)"):
+    if not ff and os.name == "nt":
+        say("\nffmpeg (it converts the game's sound and movies) is not installed, or the one on this PC will not do.")
+        if which("winget") and yes("Install it now with winget? (a normal Windows installer; it may ask for permission)"):
             subprocess.run(["winget", "install", "--id", "Gyan.FFmpeg", "-e", "--accept-package-agreements", "--accept-source-agreements"])
             ff = find_ffmpeg()
+        if not ff and yes("Download a portable copy for the setup to use instead? (about 200 MB, kept in the setup's own folder, nothing is installed)"):
+            ff = setup_ffmpeg()
     if not ff:
         say("\nffmpeg is missing. Install it (Windows: winget install Gyan.FFmpeg, or https://www.gyan.dev/ffmpeg/builds/ - the 'full' build;")
         say("Linux: sudo apt install ffmpeg), then run this again.")

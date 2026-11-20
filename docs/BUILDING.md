@@ -39,8 +39,9 @@ The setup does exactly this; do it yourself if you want control over where thing
    python build.py doctor
    python build.py all "C:\path\to\your\game\folder"
    ```
-   (`doctor` lists anything still missing. If `winget` is not available, install the "full" ffmpeg build from https://www.gyan.dev/ffmpeg/builds/ and put
-   it on PATH, or set the `FFMPEG` environment variable to the ffmpeg.exe.)
+   (`doctor` lists anything still missing. Setup checks that the ffmpeg it finds runs and has the Bink decoder, and if there is none that works it offers
+   winget, or a portable copy it downloads into `.super3dx/ffmpeg` (a pinned "full" build, its SHA-256 checked). By hand: install the "full" build from
+   https://www.gyan.dev/ffmpeg/builds/ and put it on PATH, or set the `FFMPEG` environment variable to the ffmpeg.exe.)
 4. Run `build\windows\package\super3dx.exe`. Copy or zip the `package` folder to keep or move the game.
 
 On Linux: `sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles2-mesa-dev ffmpeg python3-pip python3-venv`, then
