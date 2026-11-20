@@ -1,6 +1,6 @@
 # Super3DX+
 
-This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* built primarily for controllers, with a console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo). The player was rebuilt on SDL2 alongside the original Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
+This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* with extensive controller support and a new console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo). The player was rebuilt on SDL2 alongside the original Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
 
 - PC (Windows / Linux)
 - Android
@@ -24,7 +24,13 @@ You can't. Any pre-built binaries you see online are unauthorized distributions 
 
 ## Quick start
 
-**You need your own copy of the game:** a folder with a file called `main` and a folder called `data` inside (from the Japan or Export version of 3DX+; `docs/BUILDS.md` lists the versions known to work). Nothing from the game is included or downloaded. You also need about 15 GB of free disk space, an internet connection for the first run, and an hour or more of waiting.
+**You need your own (LEGALLY OBTAINED) copy of the game:** 
+
+*Wangan Midnight Maximum Tune 3DX+ (Export)*, or
+
+*Wangan Midnight Maximum Tune 3DX+ (JPN)*
+
+These should have a folder with a file called `main` and a folder called `data` inside (from the Japan or Export version of 3DX+; `docs/BUILDS.md` lists the versions known to work). Nothing from the game is included or downloaded. You also need about 15 GB of free disk space, an internet connection for the first run, and an hour or more of waiting.
 
 **Windows**
 
@@ -56,6 +62,7 @@ Add `--full` to the setup (`python build.py wizard --full`) to force a complete 
 **Prefer to do it by hand, or build for something else?** `docs/BUILDING.md` has the complete manual steps for Windows and Linux (no installer), the individual build commands, and the Raspberry Pi and Android builds (also `docs/PI.md`). Controls and remapping are in `docs/INPUT.md`. To build both the Japan and Export versions, run the setup again and pick the other game folder.
 
 **Are you wild man who wants to build the entire thing on your android phone without a PC?**
+
 See `docs/ANDROID_ON_DEVICE.md`
 It is substantially harder than building it on a PC, but it is possible.
 
@@ -73,9 +80,21 @@ docs/           building, testing, Pi, versus, input, builds, architecture
 
 ## NOTE - Wheel / FFB support
 
-Basic FFB/wheel support is currently implemented, but in an experimental state, as I don't have the hardware to actually test it.
+Basic FFB/wheel support is currently implemented, and has been tested to be working fairly well.
 If you get the game running and use a wheel, please let me know how your experience goes in this issue tracker:
 https://github.com/smolderyguest/Super3DXPlus/issues/2
+
+Known working wheels:
+- Logitech ( G29, G920, DFGT )
+- Thrustmaster ( T300RS )
+- Fanatec ( ClubSport DD+ )
+- Moza ( R5, R12 )
+
+Currently unknown if these wheels work with it:
+- Simagic
+- Cammus
+- Simucube
+- VRS / OSW type direct-drive
 
 ## What makes this "native"?
 
@@ -109,14 +128,23 @@ Only tested on a Raspberry Pi 5 (8 GB). Other models should work with simple con
 
 ## Status
 
-Time attack, story mode, 10 Outrun, the garage, dress-up and card screens, and versus for up to four machines (`docs/VERSUS.md`) work in both builds.
+**Not implemented:**
+- Ghost VS. Battle / Crowns (lack of interest - Re3DX+ is strictly native, doesn't use a server to sync crowns, so it would be quite boring.)
+- MacOS support (OpenGL ES has iffy support. Could be possible.)
 
-- **Not implemented:** ghost VS battle, the post-race mileage screen, the 10 Outrun post-race rewards / progress screen.
-- **Known bugs:** menu slide/select animations aren't smooth; story rival headlight flare positions are inaccurate (no position data seems to be stored for them); gamepad detection for vibration is a little finicky (basic SDL2 compatibility).
-- **Limitations:** classic iOS support was dropped (no equipment to test either).
-- **Cautions:** story mode hasn't been played all the way through. The Japan build is tested much less than Export, since I can't read Japanese; if the text is messed up, please submit an issue. The Pi and Android setup scripts (`setup-pi`, `setup-android`) are new: the Android script has built a valid app on Windows and Linux, but that app has not yet been run on a phone, and the Pi script has not yet been run start to finish on real hardware. If either fails, please open an issue with its log.
-- **Maybe later:** rollback netcode for online versus (big undertaking, noticeable performance cost).
+**Known bugs:**
+- Menu slider animations are buggy in some cases.
+- Sometimes, VS battles will hang at the start of a race indefinitely. This issue is hard to reproduce, but if you encounter it, please close the game and upload the log.txt from both machines to the issues page.
+- Headlight flare positions for story rival cars are incorrect.
 
+**Oversights:**
+- The Japan build has been tested much less than the Export build, because I can't read Japanese. Please submit an issue if you encounter any issues with the text, with as much information as possible.
+- Story mode has not been played all the way through yet, so it is unknown if any bugs come up in certain story mode missions.
+
+**Maybe later (NOT planned atm. Just possibly could be added down the line):**
+- Rollback netcode for Online VS
+- Easier EXE installer / updater
+- Implementation of online leaderboards/ghost battles, with community-hosted servers.
 
 
 ## Licence and credits
