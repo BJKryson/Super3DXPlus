@@ -1158,6 +1158,26 @@ int main(int argc, char **argv) {
   }
 #endif
   fprintf(stderr, "GL %s | %s\n", glGetString(GL_RENDERER), glGetString(GL_VERSION));
+#ifdef WMMT_WIN
+  { /* AMD's own OpenGL ES showed the picture with lifted, grey blacks where ANGLE (Direct3D 11) did not (issue 15): a default framebuffer the driver encodes as sRGB is the
+     * suspect. Say what it has, and switch the encoding off if it is on (the game's colours are already final: nothing here converts them) */
+    int cap = -1, r = 0, g = 0, b = 0;
+    SDL_GL_GetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, &cap);
+    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r), SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g), SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b);
+    const char *ext = (const char *)glGetString(GL_EXTENSIONS);
+    int has = ext && strstr(ext, "GL_EXT_sRGB_write_control") != NULL;
+    while (glGetError() != GL_NO_ERROR) {}
+    int on = glIsEnabled(0x8DB9) ? 1 : 0; /* GL_FRAMEBUFFER_SRGB(_EXT) */
+    GLenum bad = glGetError();
+    fprintf(stderr, "framebuffer: %d%d%d bits, sRGB capable pixel format %d, GL_EXT_sRGB_write_control %d, GL_FRAMEBUFFER_SRGB %s\n", r, g, b, cap, has,
+            bad ? "unknown to this driver" : on ? "on" : "off");
+    if (!bad && on && !getenv("MT3DX_SRGB_KEEP")) { /* (MT3DX_SRGB_KEEP=1: leave it, to compare) */
+      glDisable(0x8DB9);
+      while (glGetError() != GL_NO_ERROR) {}
+      fprintf(stderr, "GL_FRAMEBUFFER_SRGB was on: switched off\n");
+    }
+  }
+#endif
   if (!fullscreen && w * 3 < h * 4) SDL_SetWindowSize(P.win, w, h = w * 3 / 4); /* (narrower than 4:3: made 4:3) */
   SDL_SetWindowMinimumSize(P.win, 320, 240);
   SDL_GetWindowSize(P.win, &P.win_w, &P.win_h);
