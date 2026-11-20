@@ -53,6 +53,7 @@ static struct {
   SDL_AudioDeviceID audio;
   input_ev ev[EV_MAX];
   int n_ev, quit, win_w, win_h, exit_req;
+  int angle; /* --angle: skip the driver's own OpenGL ES and use the bundled ANGLE (Direct3D 11) */
   int hud_touch; /* --hud touch: the race with the iPad's touch keys (hud_set_style) */
   char log_file[1200]; /* the log this run writes (scrubbed at a clean exit) */
   volatile int cursor_hide; /* the game is in a race: the event thread hides the mouse pointer */
@@ -1004,6 +1005,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &w, &h), sized = 1;
     else if (!strcmp(argv[i], "--fullscreen")) fullscreen = 1;
     else if (!strcmp(argv[i], "--crt")) CRT.on = 1, crt_config();
+    else if (!strcmp(argv[i], "--angle")) P.angle = 1;
     else if (!strcmp(argv[i], "--hud") && i + 1 < argc) P.hud_touch = !strcmp(argv[++i], "touch");
     else if (argv[i][0] != '-') data = argv[i];
     else { fprintf(stderr, "unknown option %s\n", argv[i]); return 2; }
@@ -1108,14 +1110,15 @@ int main(int argc, char **argv) {
     if (SDL_GetDisplayUsableBounds(0, &area) == 0 && h > area.h * 92 / 100) h = area.h * 92 / 100, w = h * 4 / 3;
   }
   Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-  P.win = getenv("MT3DX_NOGL") ? NULL : SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags); /* (MT3DX_NOGL=1: test the no-driver message) */
+  if (P.angle) fprintf(stderr, "--angle: skipping the driver's OpenGL ES, using ANGLE\n");
+  P.win = P.angle || getenv("MT3DX_NOGL") ? NULL : SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags); /* (MT3DX_NOGL=1: test the no-driver message) */
   if (!P.win) {
     /* the graphics driver offers no OpenGL ES (a virtual machine, a remote desktop, a very old or generic driver): try the EGL route (it finds an
      * ANGLE next to the game, if one is there), then say what is wrong instead of just closing */
     char first[256];
     snprintf(first, sizeof first, "%s", SDL_GetError());
     fprintf(stderr, "no window: %s\n", first);
-    if (getenv("MT3DX_NOGL")) snprintf(first, sizeof first, "test: no driver"), atoi(getenv("MT3DX_NOGL")) == 2 ? SDL_setenv("SDL_VIDEO_EGL_DRIVER", "bogus_egl.dll", 1) : 0; /* (2: and no ANGLE either) */
+    if (P.angle || getenv("MT3DX_NOGL")) snprintf(first, sizeof first, "test: no driver"), !P.angle && atoi(getenv("MT3DX_NOGL")) == 2 ? SDL_setenv("SDL_VIDEO_EGL_DRIVER", "bogus_egl.dll", 1) : 0; /* (2: and no ANGLE either) */
     SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
     P.win = SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
     if (!P.win) {
