@@ -777,6 +777,11 @@ static int game(void *arg) {
     }
     double p0 = now_s();
     SDL_GL_SwapWindow(P.win);
+    {
+      static int finish = -1;
+      if (finish < 0) finish = getenv("MT3DX_FINISH") ? atoi(getenv("MT3DX_FINISH")) : 0;
+      if (smooth && finish) glFinish(); /* test: wait for the swap to be done, so no frames queue up behind it */
+    }
     const double t_swap1 = now_s();
     app_frame_done((t_swap1 - p0) * 1000.0);
     /* The swap interval is only a request: Mesa on WSLg ignores it and the game ran at several hundred frames a
