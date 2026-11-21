@@ -710,7 +710,9 @@ static int game(void *arg) {
       app_key(APP_KEY_ACCEL, accel);
       app_key(APP_KEY_BRAKE, brake);
     }
+    const double t_app0 = now_s();
     app_frame(dt);
+    const double t_app1 = now_s();
     P.fs_want = app_fullscreen();
     {
       int act = app_net_act(); /* the network options' buttons */
@@ -773,7 +775,8 @@ static int game(void *arg) {
     }
     double p0 = now_s();
     SDL_GL_SwapWindow(P.win);
-    app_frame_done((now_s() - p0) * 1000.0);
+    const double t_swap1 = now_s();
+    app_frame_done((t_swap1 - p0) * 1000.0);
     /* The swap interval is only a request: Mesa on WSLg ignores it and the game ran at several hundred frames a
      * second, flooding the display path. The game's clock is 60 Hz, so hold it there if the swap did not. */
     {
@@ -783,6 +786,18 @@ static int game(void *arg) {
       due += smooth ? 1.0 / refresh_hz : 1.0 / 60.0;
       if (due > t + 0.002) SDL_Delay((Uint32)((due - t - 0.002) * 1000.0)); /* (a sleep is as coarse as the timer: the last 2 ms spin) */
       while (now_s() < due) {}
+    }
+    { /* test: MT3DX_HITCH=<ms> logs a frame that took longer, and where the time went (the work before the app's frame, the frame, the swap, the hold) */
+      static double limit = -1;
+      if (limit < 0) limit = getenv("MT3DX_HITCH") ? atof(getenv("MT3DX_HITCH")) * 1e-3 : 0;
+      double t_end = now_s();
+      static int flog = -1, fcount;
+      if (flog < 0) flog = getenv("MT3DX_FRAMELOG") ? atoi(getenv("MT3DX_FRAMELOG")) : 0;
+      if (flog > 0 && smooth && ++fcount > 600 && fcount <= 600 + flog) /* (test: every frame's length and parts, from the race's 600th frame) */
+        fprintf(stderr, "frame: t %.3f dt %.2f total %.2f = app %.2f swap %.2f hold %.2f\n", t_end - run0, dt * 1e3, (t_end - now) * 1e3, (t_app1 - t_app0) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3);
+      if (limit > 0 && t_end - now > limit)
+        fprintf(stderr, "hitch: %.1f ms = pre %.1f + app %.1f + after %.1f + swap %.1f + hold %.1f (dt %.1f, screen %d, smooth %d)\n", (t_end - now) * 1e3, (t_app0 - now) * 1e3, (t_app1 - t_app0) * 1e3,
+                (p0 - t_app1) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3, dt * 1e3, app_screen(), smooth);
     }
     /* MT3DX_LOG: the frame rate each 2 s, to tell a frozen game from a still screen */
     static int frames;
