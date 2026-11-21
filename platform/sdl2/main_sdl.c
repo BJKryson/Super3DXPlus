@@ -180,6 +180,30 @@ static void shot_check(double t) {
     init = 1;
     for (const char *s = getenv("MT3DX_SHOT"); s && *s && n < 16; s = strchr(s, ',') ? strchr(s, ',') + 1 : NULL) at[n++] = atof(s);
   }
+  { /* MT3DX_SHOT_BURST=<s>:<n>: n frames in a row from second s, as burst_<k>.ppm (how a race's motion looks frame to frame) */
+    static double b0 = -2;
+    static int bn, bk;
+    if (b0 == -2) {
+      b0 = -1;
+      if (getenv("MT3DX_SHOT_BURST")) sscanf(getenv("MT3DX_SHOT_BURST"), "%lf:%d", &b0, &bn);
+    }
+    if (b0 >= 0 && t >= b0 && bk < bn) {
+      const char *dir = getenv("MT3DX_SHOT_DIR");
+      char path[1200];
+      snprintf(path, sizeof path, "%s/burst_%03d.ppm", dir ? dir : ".", bk++);
+      int w = P.win_w, h = P.win_h;
+      unsigned char *px = malloc((size_t)w * h * 4), *rgb = malloc((size_t)w * h * 3);
+      if (px && rgb) {
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        for (int y = 0; y < h; ++y)
+          for (int x = 0; x < w; ++x) memcpy(rgb + ((size_t)(h - 1 - y) * w + x) * 3, px + ((size_t)y * w + x) * 4, 3);
+        FILE *f = fopen(path, "wb");
+        if (f) fprintf(f, "P6\n%d %d\n255\n", w, h), fwrite(rgb, 1, (size_t)w * h * 3, f), fclose(f);
+      }
+      free(px);
+      free(rgb);
+    }
+  }
   for (int i = 0; i < n; ++i) {
     if (done[i] || t < at[i]) continue;
     done[i] = 1;
