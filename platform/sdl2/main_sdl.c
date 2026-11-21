@@ -1219,6 +1219,16 @@ int main(int argc, char **argv) {
 #if defined(_WIN32) && !defined(WMMT_NO_AUTO_ANGLE)
   check_amd = !P.angle && !P.native_gl && !getenv("MT3DX_NATIVE_GL") && !getenv("MT3DX_NOGL") && angle_wanted();
 #endif
+#if defined(_WIN32) && !defined(WMMT_NO_AUTO_ANGLE)
+  if (check_amd) { /* a screen of 90 Hz or more starts on ANGLE too: the NVIDIA driver's own OpenGL ES let the frame queue run empty and refill every 3 s there (a hitch in smooth motion's
+                    * 120 fps), ANGLE's Direct3D 11 swap chain did not (5 races in a row: every 10 s average within 8.34-8.40 ms at 120 Hz) */
+    SDL_DisplayMode dm;
+    if (SDL_GetDesktopDisplayMode(0, &dm) == 0 && dm.refresh_rate >= 90) {
+      P.angle = 1, check_amd = 0;
+      fprintf(stderr, "the screen runs at %d Hz: starting on ANGLE (--native-gl or a native-gl.txt beside the exe keeps the driver's OpenGL ES)\n", dm.refresh_rate);
+    }
+  }
+#endif
   Uint32 flags = SDL_WINDOW_OPENGL | (check_amd ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN) | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
   if (P.angle) fprintf(stderr, "--angle: skipping the driver's OpenGL ES, using ANGLE\n");
   if (getenv("MT3DX_ANGLE_AUTO")) fprintf(stderr, "ANGLE chosen automatically: the graphics card is an AMD one (--native-gl or MT3DX_NATIVE_GL=1 keeps the driver's own OpenGL ES)\n");
