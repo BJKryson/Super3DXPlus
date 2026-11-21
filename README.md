@@ -1,10 +1,12 @@
 # Super3DX+
 
-This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* with extensive controller support and a new console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo). The player was rebuilt on SDL2 alongside the original Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
+This is an accessibility-focused native port of *Wangan Midnight Maximum Tune 3DX+* with extensive controller support, native wheel support, and a new console-style frontend. It is based on the static recompilation work of [Re3DX+](https://github.com/Allannn-sudo). The player was rebuilt on SDL2 alongside the original Android player. It supports both the Japan and Export (English) versions of the game, and runs on:
 
 - PC (Windows / Linux)
 - Android
 - Raspberry Pi
+
+The goal of this project is to allow you to play the game natively, and access its features like car saving/loading without needing to run several additional programs and compatibility layers to do so.
 
 Showcase videos: 
 
@@ -85,7 +87,7 @@ If you get the game running and use a wheel, please let me know how your experie
 https://github.com/smolderyguest/Super3DXPlus/issues/2
 
 Known working wheels:
-- Logitech ( G29, G920, DFGT )
+- Logitech ( RS50, G29, G920, DFGT )
 - Thrustmaster ( T300RS )
 - Fanatec ( ClubSport DD+ )
 - Moza ( R5, R12 )
