@@ -606,6 +606,7 @@ static int game(void *arg) {
       fprintf(stderr, "display %d Hz\n", mode.refresh_rate);
     }
   }
+  app_display_hz((float)refresh_hz);
   int sw = SDL_GL_SetSwapInterval(interval);
   if (sw != 0 && interval != 1) interval = 1, sw = SDL_GL_SetSwapInterval(1);
   fprintf(stderr, "swap interval: asked %d, set %s, now %d\n", interval, sw == 0 ? "ok" : SDL_GetError(), SDL_GL_GetSwapInterval());
