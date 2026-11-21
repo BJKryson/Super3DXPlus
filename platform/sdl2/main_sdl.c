@@ -667,6 +667,7 @@ static int game(void *arg) {
   double start_at = getenv("MT3DX_AUTOSTART") ? now_s() + atof(getenv("MT3DX_AUTOSTART")) : 0;
   const double run0 = now_s();
   while (!P.quit) {
+    const double t_top = now_s();
     if (start_at > 0 && now_s() > start_at) {
       start_at = now_s() + 1.0;
       app_press_start();
@@ -795,7 +796,7 @@ static int game(void *arg) {
       static int flog = -1, fcount;
       if (flog < 0) flog = getenv("MT3DX_FRAMELOG") ? atoi(getenv("MT3DX_FRAMELOG")) : 0;
       if (flog > 0 && smooth && ++fcount > 600 && fcount <= 600 + flog) /* (test: every frame's length and parts, from the race's 600th frame) */
-        fprintf(stderr, "frame: t %.3f dt %.2f total %.2f = app %.2f swap %.2f hold %.2f\n", t_end - run0, dt * 1e3, (t_end - now) * 1e3, (t_app1 - t_app0) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3);
+        fprintf(stderr, "frame: t %.3f dt %.2f total %.2f = app %.2f swap %.2f hold %.2f top %.2f\n", t_end - run0, dt * 1e3, (t_end - now) * 1e3, (t_app1 - t_app0) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3, (now - t_top) * 1e3);
       if (limit > 0 && t_end - now > limit)
         fprintf(stderr, "hitch: %.1f ms = pre %.1f + app %.1f + after %.1f + swap %.1f + hold %.1f (dt %.1f, screen %d, smooth %d)\n", (t_end - now) * 1e3, (t_app0 - now) * 1e3, (t_app1 - t_app0) * 1e3,
                 (p0 - t_app1) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3, dt * 1e3, app_screen(), smooth);
