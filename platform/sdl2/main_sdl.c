@@ -570,10 +570,13 @@ static int game(void *arg) {
    * as many vblanks as the display has per 60th of a second (a swap interval of 2 on a 120 Hz display), else the frames beat against
    * the refresh and judder. A refresh that is no multiple of 60 (144 Hz) keeps the interval 1 and the 60 Hz hold below. */
   int interval = 1;
+  double refresh_hz = 60.0;
+  int smooth_now = -1;
   {
     SDL_DisplayMode mode;
     int di = SDL_GetWindowDisplayIndex(P.win);
     if (di >= 0 && SDL_GetCurrentDisplayMode(di, &mode) == 0 && mode.refresh_rate > 0) {
+      refresh_hz = mode.refresh_rate;
       int n = (mode.refresh_rate + 30) / 60;
       if (n >= 2 && abs(mode.refresh_rate - 60 * n) <= 4) interval = n;
       fprintf(stderr, "display %d Hz\n", mode.refresh_rate);
@@ -738,6 +741,12 @@ static int game(void *arg) {
     if (level > 0 && !CRT.on) lv_present(level, fb_w, fb_h, P.win_w, P.win_h); /* (before the shot: it sees what the window gets) */
     if (getenv("MT3DX_SHOT")) shot_check(now_s() - run0); /* (the movie too; in the CRT mode the game's own 640x480) */
     if (CRT.on) crt_present(P.win_w, P.win_h);
+    int smooth = app_smooth(); /* (a race drawn with smooth motion: a frame every refresh of the display, not 60 a second) */
+    if (smooth != smooth_now) {
+      smooth_now = smooth;
+      SDL_GL_SetSwapInterval(smooth ? 1 : interval);
+      fprintf(stderr, "smooth motion %s: swap interval %d\n", smooth ? "on" : "off", smooth ? 1 : interval);
+    }
     double p0 = now_s();
     SDL_GL_SwapWindow(P.win);
     app_frame_done((now_s() - p0) * 1000.0);
@@ -747,7 +756,7 @@ static int game(void *arg) {
       static double due;
       double t = now_s();
       if (due == 0 || t - due > 0.1) due = t;
-      due += 1.0 / 60.0;
+      due += smooth ? 1.0 / refresh_hz : 1.0 / 60.0;
       if (due > t + 0.002) SDL_Delay((Uint32)((due - t - 0.002) * 1000.0)); /* (a sleep is as coarse as the timer: the last 2 ms spin) */
       while (now_s() < due) {}
     }
