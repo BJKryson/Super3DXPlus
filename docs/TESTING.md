@@ -16,6 +16,8 @@ Set as environment variables (they do nothing unset, and silence the sound unles
 | `MT3DX_SHAKE=n` | the CAMERA SHAKE (0..10) for this run, whatever the option says |
 | `MT3DX_SRGB_KEEP=1` | (Windows) leave the driver's `GL_FRAMEBUFFER_SRGB` as it is, to compare pictures with and without the game switching it off |
 | `--angle` (or `MT3DX_NOGL=1`) | (Windows) use the bundled ANGLE instead of the driver's OpenGL ES: the log says "window made through EGL". `MT3DX_NOGL=1` or `2` | (Windows) skip the first window attempt to test the fallback: 1 goes on to the bundled ANGLE, 2 also hides it to see the "no OpenGL ES" message box |
+| `--native-gl` (or `MT3DX_NATIVE_GL=1`, or a `native-gl.txt` beside the exe) | (Windows) keep the driver's own OpenGL ES on an AMD card, which starts on ANGLE otherwise (a build with `WMMT_NO_AUTO_ANGLE=1` never switches) |
+| `MT3DX_FAKE_AMD=1` | (Windows) act as if the card were an AMD one: the player starts again on ANGLE, and the new log (the old one is `log-prev.txt`) says "ANGLE chosen automatically" |
 | `MT3DX_NOREADY=1` | a `MT3DX_VSAUTO=join` player does not click READY |
 | `MT3DX_CALLTEST=km` | show the "Remaining km" callout (3 or 5) at a race's start and again every 4 s |
 | `MT3DX_AUTODRIVE=1` `MT3DX_AUTODRIVE_KMH=n` | hold the accelerator in a race (below n km/h) |

@@ -54,6 +54,7 @@ static struct {
   input_ev ev[EV_MAX];
   int n_ev, quit, win_w, win_h, exit_req;
   int angle; /* --angle: skip the driver's own OpenGL ES and use the bundled ANGLE (Direct3D 11) */
+  int native_gl, via_egl; /* --native-gl: keep the driver's own OpenGL ES on AMD graphics (they get ANGLE by default); via_egl: the window came through EGL (ANGLE) already */
   int hud_touch; /* --hud touch: the race with the iPad's touch keys (hud_set_style) */
   char log_file[1200]; /* the log this run writes (scrubbed at a clean exit) */
   volatile int cursor_hide; /* the game is in a race: the event thread hides the mouse pointer */
@@ -1001,6 +1002,48 @@ static float to_layout_y(int y) {
   return (float)(y - (P.win_h - fh)) * LAYOUT_H / (float)fh;
 }
 
+#if defined(_WIN32) && !defined(WMMT_NO_AUTO_ANGLE)
+/* AMD graphics start on the bundled ANGLE (see main): wanted only if ANGLE's libEGL.dll is next to the program, and no file named native-gl.txt is
+ * (an empty one is the way to keep the driver's own OpenGL ES without a command line) */
+static int angle_wanted(void) {
+  char *base = SDL_GetBasePath();
+  int ok = 0;
+  if (base) {
+    char p[1200];
+    FILE *f;
+    snprintf(p, sizeof p, "%slibEGL.dll", base);
+    if ((f = fopen(p, "rb"))) fclose(f), ok = 1;
+    snprintf(p, sizeof p, "%snative-gl.txt", base);
+    if ((f = fopen(p, "rb"))) fclose(f), ok = 0;
+    SDL_free(base);
+  }
+  return ok;
+}
+
+/* this program again with --angle (1: started, the caller leaves; 0: could not, the caller goes on). The log is let go first: the new run keeps it as
+ * log-prev.txt, so the line saying why stays in the report */
+static int restart_on_angle(void) {
+  static char cmd[4096];
+  snprintf(cmd, sizeof cmd, "%s --angle", GetCommandLineA());
+  fprintf(stderr, "AMD graphics (%s): starting again on ANGLE (--native-gl keeps the driver's OpenGL ES)\n", (const char *)glGetString(GL_RENDERER));
+  SDL_setenv("MT3DX_ANGLE_AUTO", "1", 1);
+  fflush(stderr);
+  if (P.log_file[0]) fclose(stderr);
+  STARTUPINFOA si;
+  PROCESS_INFORMATION pi;
+  memset(&si, 0, sizeof si);
+  si.cb = sizeof si;
+  if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
+    if (P.log_file[0] && freopen(P.log_file, "a", stderr)) setvbuf(stderr, NULL, _IOLBF, 0);
+    fprintf(stderr, "could not start again (error %lu): staying on the driver's OpenGL ES\n", (unsigned long)GetLastError());
+    return 0;
+  }
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+  return 1;
+}
+#endif
+
 int main(int argc, char **argv) {
   int w = LAYOUT_W, h = LAYOUT_H, fullscreen = 0, sized = 0;
   int use_loader_thread = getenv("MT3DX_LOADER_THREAD") != NULL;
@@ -1012,6 +1055,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--fullscreen")) fullscreen = 1;
     else if (!strcmp(argv[i], "--crt")) CRT.on = 1, crt_config();
     else if (!strcmp(argv[i], "--angle")) P.angle = 1;
+    else if (!strcmp(argv[i], "--native-gl")) P.native_gl = 1;
     else if (!strcmp(argv[i], "--hud") && i + 1 < argc) P.hud_touch = !strcmp(argv[++i], "touch");
     else if (argv[i][0] != '-') data = argv[i];
     else { fprintf(stderr, "unknown option %s\n", argv[i]); return 2; }
@@ -1029,7 +1073,7 @@ int main(int argc, char **argv) {
   }
   if (base) SDL_free(base);
   if (!data) {
-    fprintf(stderr, "usage: %s [data dir] [--save DIR] [--size WxH] [--fullscreen] [--crt] [--hud arcade|touch] [--loader-thread]\n", argv[0]);
+    fprintf(stderr, "usage: %s [data dir] [--save DIR] [--size WxH] [--fullscreen] [--crt] [--angle | --native-gl] [--hud arcade|touch] [--loader-thread]\n", argv[0]);
     return 2;
   }
   if (data == base_data) {
@@ -1115,8 +1159,14 @@ int main(int argc, char **argv) {
     w = (int)(1280.0f * sc), h = (int)(960.0f * sc);
     if (SDL_GetDisplayUsableBounds(0, &area) == 0 && h > area.h * 92 / 100) h = area.h * 92 / 100, w = h * 4 / 3;
   }
-  Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+  /* (Windows: the window stays hidden until the graphics card is known: an AMD one goes to ANGLE, which means starting again) */
+  int check_amd = 0;
+#if defined(_WIN32) && !defined(WMMT_NO_AUTO_ANGLE)
+  check_amd = !P.angle && !P.native_gl && !getenv("MT3DX_NATIVE_GL") && !getenv("MT3DX_NOGL") && angle_wanted();
+#endif
+  Uint32 flags = SDL_WINDOW_OPENGL | (check_amd ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN) | SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
   if (P.angle) fprintf(stderr, "--angle: skipping the driver's OpenGL ES, using ANGLE\n");
+  if (getenv("MT3DX_ANGLE_AUTO")) fprintf(stderr, "ANGLE chosen automatically: the graphics card is an AMD one (--native-gl or MT3DX_NATIVE_GL=1 keeps the driver's own OpenGL ES)\n");
   P.win = P.angle || getenv("MT3DX_NOGL") ? NULL : SDL_CreateWindow("Super3DX+", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags); /* (MT3DX_NOGL=1: test the no-driver message) */
   if (!P.win) {
     /* the graphics driver offers no OpenGL ES (a virtual machine, a remote desktop, a very old or generic driver): try the EGL route (it finds an
@@ -1140,6 +1190,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     fprintf(stderr, "window made through EGL\n");
+    P.via_egl = 1;
   }
   /* OpenGL ES 3 where there is, else 2 */
   static const int versions[2][2] = { { 3, 0 }, { 2, 0 } };
@@ -1164,6 +1215,15 @@ int main(int argc, char **argv) {
   }
 #endif
   fprintf(stderr, "GL %s | %s\n", glGetString(GL_RENDERER), glGetString(GL_VERSION));
+#if defined(_WIN32) && !defined(WMMT_NO_AUTO_ANGLE)
+  if (check_amd && !P.via_egl) { /* AMD's own OpenGL ES drew every other frame of a race from a stale buffer on a Radeon RX 9070 XT (issue 33) and lifted the blacks on others (issue 15):
+                                  * ANGLE (Direct3D 11) shows neither. An AMD card therefore starts again on it, unless told not to */
+    const char *vendor = (const char *)glGetString(GL_VENDOR), *rend = (const char *)glGetString(GL_RENDERER);
+    int amd = (vendor && (strstr(vendor, "ATI") || strstr(vendor, "AMD"))) || (rend && (strstr(rend, "AMD") || strstr(rend, "Radeon"))) || getenv("MT3DX_FAKE_AMD"); /* (MT3DX_FAKE_AMD=1: test the switch on any card) */
+    if (amd && restart_on_angle()) return 0;
+  }
+  if (check_amd) SDL_ShowWindow(P.win);
+#endif
 #ifdef WMMT_WIN
   { /* AMD's own OpenGL ES showed the picture with lifted, grey blacks where ANGLE (Direct3D 11) did not (issue 15): a default framebuffer the driver encodes as sRGB is the
      * suspect. Say what it has, and switch the encoding off if it is on (the game's colours are already final: nothing here converts them) */

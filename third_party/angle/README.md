@@ -1,8 +1,9 @@
 # ANGLE (libEGL.dll, libGLESv2.dll)
 
 The Windows player starts on the graphics driver's own OpenGL ES. On a PC whose driver has none (a virtual machine, remote desktop, a very old or
-generic driver) it falls back to these two files, Google's ANGLE, which runs OpenGL ES on top of Direct3D 11. They sit next to `super3dx.exe`
-and are not used when the driver has OpenGL ES.
+generic driver) it falls back to these two files, Google's ANGLE, which runs OpenGL ES on top of Direct3D 11. On an AMD graphics card it starts on them
+by choice (AMD's own OpenGL ES had lifted blacks and, on a Radeon RX 9070 XT, a stale frame every other frame in races: issues 15 and 33); `--native-gl`,
+`MT3DX_NATIVE_GL=1` or a `native-gl.txt` beside the exe keeps the driver's. They sit next to `super3dx.exe` and are not used by other cards that have OpenGL ES.
 
 - Version 2.1.28066 (git bfdad9d663f7), 64-bit Windows. ANGLE needs `d3dcompiler_47.dll`, which Windows 10 and 11 have.
 - Google's repository (https://github.com/google/angle, https://chromium.googlesource.com/angle/angle) publishes source only, no binaries. These are the two files from the official

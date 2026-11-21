@@ -55,7 +55,7 @@ On Linux: `sudo apt install build-essential libsdl2-dev libegl1-mesa-dev libgles
 - "Access is denied", "being used by another process": close File Explorer windows inside the folder and any running copy of the game, pause the antivirus
   or exclude the folder, and make sure the folder is not under Program Files.
 - "The drive ran out of space": the build needs about 15 GB free.
-- A path-too-long error: move the project to a short path such as `C:\Super3DXPlus`.
+- A path-too-long error: move the project to a short path such as `C:\Super3DXPlus`. (The Android setup keeps its SDK in `%LOCALAPPDATA%\Super3DX\android-sdk` by itself when the project's folder is deep, so only the rest of the setup needs the short path.)
 - A download failed: check the internet connection, a firewall, a VPN or a proxy; the message gives the file's address so you can fetch it by hand.
 - "GENERATION STOPPED": the tools could not read the game's `main`. Check that the version is one of those in `docs/BUILDS.md` and that the copy is complete.
 - A conversion step failed: `python tools/pipeline.py convert <game folder> --only <step>` re-runs just that step once the cause is fixed.
@@ -111,6 +111,14 @@ The first build compiles the physics (`phys_rc.c`, a minute or two); later ones 
 data and saves next to it (`play.bat --size 1280x960` for a bigger window; the layout is 4:3).
 
 Run it: double-click `super3dx.exe` (it takes `data/` and `save/` from beside itself, opens at 1280x960 and has the high-quality effects on; `play.bat` is optional), or from a shell: `build\windows\super3dx.exe [data] [--save save] [--size WxH] [--fullscreen]`. `MT3DX_HQ=0` turns the effects off (a slow GPU). Controls and remapping: `docs/INPUT.md`.
+
+**AMD graphics on Windows start on ANGLE.** The player checks the graphics card's name once the window exists, and on an AMD / Radeon card starts itself again on the bundled ANGLE (`libEGL.dll` and `libGLESv2.dll` beside the exe: OpenGL ES over Direct3D 11) in place of AMD's own OpenGL ES, which showed lifted blacks (issue 15) and, on a Radeon RX 9070 XT, every other frame of a race from a stale buffer (issue 33). The log says so (`ANGLE chosen automatically`). To keep the driver's own OpenGL ES instead:
+
+- for one run: `super3dx.exe --native-gl` (or the variable `MT3DX_NATIVE_GL=1`);
+- for good, without a command line: an empty file named `native-gl.txt` next to `super3dx.exe`;
+- for a build that never switches: `set WMMT_NO_AUTO_ANGLE=1` before `python build.py exe`.
+
+`super3dx.exe --angle` still forces ANGLE on any card. Without the two ANGLE files beside the exe nothing switches.
 
 ## Raspberry Pi 5
 

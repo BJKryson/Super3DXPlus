@@ -251,6 +251,8 @@ def build_exe(target, cc, opt, jobs):
             die("no SDL2 development files for mingw: `python build.py setup-sdl2` (or set SDL2_DIR)")
         flags += ["-D__USE_MINGW_ANSI_STDIO=1", "-DWMMT_WIN", "-DGL_APICALL=", "-D_POSIX_THREAD_SAFE_FUNCTIONS", "-D_FILE_OFFSET_BITS=64",
                   "-include", "platform/sdl2/winport.h", "-Iplatform/sdl2/winshim", "-I" + os.path.join(sdl, "include", "SDL2")]
+        if os.environ.get("WMMT_NO_AUTO_ANGLE"):  # a build that keeps the driver's own OpenGL ES on AMD graphics (they start on ANGLE otherwise)
+            flags.append("-DWMMT_NO_AUTO_ANGLE")
         link = ["-L" + os.path.join(sdl, "lib"), "-lmingw32", "-lSDL2main", "-lSDL2", "-lm", "-lws2_32", "-ladvapi32"]
         # what the static SDL2 itself needs from Windows (MinGW links most of these by default, Zig does not)
         link += ["-luser32", "-lgdi32", "-lwinmm", "-limm32", "-lversion", "-lsetupapi", "-lole32", "-loleaut32", "-lcfgmgr32", "-lshell32", "-luuid"]
