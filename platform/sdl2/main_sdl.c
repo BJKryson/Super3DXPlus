@@ -607,6 +607,14 @@ static int game(void *arg) {
     }
   }
   app_display_hz((float)refresh_hz);
+  /* ANGLE's swap interval 2 on a 120 Hz screen gave a game at 37 fps with 40 ms frames in it (the driver's own: an even 60): its races are smooth-motion races then, one frame a refresh,
+   * whatever the SMOOTH MOTION option says; the menus too at an interval of 1 */
+  int fast_menus = 0;
+  if ((P.angle || P.via_egl) && interval > 1) {
+    interval = 1, fast_menus = 1;
+    app_force_smooth(1);
+    fprintf(stderr, "ANGLE on a %d Hz screen: a frame every refresh, in the menus too, and smooth motion in the races whatever the option says\n", (int)refresh_hz);
+  }
   int sw = SDL_GL_SetSwapInterval(interval);
   if (sw != 0 && interval != 1) interval = 1, sw = SDL_GL_SetSwapInterval(1);
   fprintf(stderr, "swap interval: asked %d, set %s, now %d\n", interval, sw == 0 ? "ok" : SDL_GetError(), SDL_GL_GetSwapInterval());
@@ -790,7 +798,7 @@ static int game(void *arg) {
       static double due;
       double t = now_s();
       if (due == 0 || t - due > 0.1) due = t;
-      due += smooth ? 1.0 / refresh_hz : 1.0 / 60.0;
+      due += smooth || fast_menus ? 1.0 / refresh_hz : 1.0 / 60.0;
       if (due > t + 0.002) SDL_Delay((Uint32)((due - t - 0.002) * 1000.0)); /* (a sleep is as coarse as the timer: the last 2 ms spin) */
       while (now_s() < due) {}
     }
@@ -800,7 +808,7 @@ static int game(void *arg) {
       double t_end = now_s();
       static int flog = -1, fcount;
       if (flog < 0) flog = getenv("MT3DX_FRAMELOG") ? atoi(getenv("MT3DX_FRAMELOG")) : 0;
-      if (flog > 0 && smooth && ++fcount > 600 && fcount <= 600 + flog) /* (test: every frame's length and parts, from the race's 600th frame) */
+      if (flog > 0 && app_racing() && ++fcount > 600 && fcount <= 600 + flog) /* (test: every frame's length and parts, from the race's 600th frame) */
         fprintf(stderr, "frame: t %.3f dt %.2f total %.2f = app %.2f swap %.2f hold %.2f top %.2f\n", t_end - run0, dt * 1e3, (t_end - now) * 1e3, (t_app1 - t_app0) * 1e3, (t_swap1 - p0) * 1e3, (t_end - t_swap1) * 1e3, (now - t_top) * 1e3);
       if (limit > 0 && t_end - now > limit)
         fprintf(stderr, "hitch: %.1f ms = pre %.1f + app %.1f + after %.1f + swap %.1f + hold %.1f (dt %.1f, screen %d, smooth %d)\n", (t_end - now) * 1e3, (t_app0 - now) * 1e3, (t_app1 - t_app0) * 1e3,
